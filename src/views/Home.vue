@@ -15,7 +15,12 @@ import { useRouter } from 'vue-router';
 
 const router = useRouter();
 
-const routesRendered = computed(() => router.getRoutes().filter(route => route.path != "/"));
+const routesRendered = computed(() => router.getRoutes().filter(route => {
+  if (route.path === '/' || route.path === '/home') {
+    return false;
+  }
+  return true;
+}));
 
 const routeTo = (path: string) => {
   router.push(path);

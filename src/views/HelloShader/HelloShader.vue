@@ -1,6 +1,6 @@
 <template>
     <div size-screen>
-        <div w-200 h-100 ref="canvasTarget"></div>
+        <div size-full ref="canvasTarget"></div>
     </div>
 
 </template>
@@ -9,19 +9,23 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { BasicEngine } from "@/ts/BasicEngine"
 import { BasicObjGenerator } from '@/ts/BasicObjGenerator';
+import { MaterialGenerator } from '@/ts/MaterialGenerator';
 import { Color, Vector3 } from 'three';
+import fragmentShader from '@/views/HelloShader/fragmentShader.glsl?raw'
+import vertexShader from '@/views/HelloShader/vertexShader.glsl?raw'
 
 const canvasTarget = ref<HTMLDivElement | null>(null);
 const engine = new BasicEngine()
 
+engine.animate()
+
+const plane = BasicObjGenerator.createScreenShaderPlane(
+    vertexShader, fragmentShader, engine.getUniforms()
+)
+engine.addObj(plane)
+
 const main = () => {
     engine.init(canvasTarget.value!)
-    engine.animate()
-
-    engine.addObj(BasicObjGenerator.createBasicBox(new Vector3(2, 2, 2),
-        new Color(0, 0.6, 0),
-        new Vector3(0, 0, 0)
-    ))
 
 }
 

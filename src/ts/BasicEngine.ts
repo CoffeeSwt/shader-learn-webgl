@@ -8,6 +8,10 @@ import {
   type Camera,
 } from "three";
 
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+import { Uniform, UniformsManager } from "@/ts/uniforms.ts";
+
 export class BasicEngine {
   public domElement: HTMLDivElement | null = null;
   public renderer: WebGLRenderer = new WebGLRenderer({ antialias: true });
@@ -23,14 +27,13 @@ export class BasicEngine {
   public mousePositionSTD: Vector2 = new Vector2(); // [0,1]
   public mousePositionNDC: Vector2 = new Vector2(); // [-1,1]
   private resizeObserver: ResizeObserver | null = null;
+  public controls: OrbitControls | null = null; // 以后可能会用到轨道控制器
 
-  public uniforms = {
-    time: { value: 0.0 },
-    mouse: { value: new Vector2(0.0, 0.0) },
-    resolution: {
-      value: new Vector2(window.innerWidth, window.innerHeight),
-    },
-  };
+  public uniforms = new UniformsManager({
+    u_time: new Uniform("f", 0),
+    u_resolution: new Uniform("v2", new Vector2()),
+    u_mouse: new Uniform("v2", new Vector2()),
+  });
 
   constructor() {
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -59,9 +62,15 @@ export class BasicEngine {
         (e.offsetX / rect.width) * 2 - 1,
         -(e.offsetY / rect.height) * 2 + 1
       );
-
-      this.uniforms.mouse.value.copy(this.mousePositionSTD);
+      this.uniforms.set("u_mouse", this.mousePosition);
     });
+
+    //初始化controls
+    this.controls = new OrbitControls(
+      this.camera as PerspectiveCamera,
+      this.renderer.domElement
+    );
+    this.controls.enableDamping = true;
   }
 
   private resize() {
@@ -74,22 +83,40 @@ export class BasicEngine {
       this.domElement.offsetWidth / this.domElement.offsetHeight;
     (this.camera as PerspectiveCamera).updateProjectionMatrix();
 
-    this.uniforms.resolution.value.set(
-      this.domElement.offsetWidth,
-      this.domElement.offsetHeight
+    this.uniforms.set(
+      "u_resolution",
+      new Vector2(this.domElement.offsetWidth, this.domElement.offsetHeight)
     );
   }
 
   private render() {
     const elapsedTime = this.clock.getElapsedTime();
 
-    this.uniforms.time.value = elapsedTime;
+    this.uniforms.set("u_time", elapsedTime);
+
+    this.controls?.update();
 
     this.renderer.render(this.scene, this.camera);
   }
 
   public addObj(object: Mesh) {
     this.scene.add(object);
+  }
+
+  public getUniforms() {
+    return this.uniforms.getUniformObject();
+  }
+
+  public removeObj(object: Mesh) {
+    this.scene.remove(object);
+  }
+
+  public getObjectByName(name: string): Mesh | undefined {
+    return this.scene.getObjectByName(name) as Mesh;
+  }
+
+  public getObjectsByUUID(uuid: string): Mesh | undefined {
+    return this.scene.getObjectByProperty("uuid", uuid) as Mesh;
   }
 
   public dispose() {
