@@ -25,4 +25,9 @@ export const routes: Array<RouteRecordRaw> = [
     name: "L3",
     component: () => import("@/views/Lessons/l3/L3.vue"),
   },
+  {
+    path: "/lessons/l4",
+    name: "BlackHole",
+    component: () => import("@/views/Lessons/l4/L4.vue"),
+  },
 ];

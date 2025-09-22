@@ -28,11 +28,13 @@ export class BasicEngine {
   public mousePositionNDC: Vector2 = new Vector2(); // [-1,1]
   private resizeObserver: ResizeObserver | null = null;
   public controls: OrbitControls | null = null; // 以后可能会用到轨道控制器
+  private zoomFactor: number = 3.5;
 
   public uniforms = new UniformsManager({
     u_time: new Uniform("f", 0),
     u_resolution: new Uniform("v2", new Vector2()),
     u_mouse: new Uniform("v2", new Vector2()),
+    u_zoom: new Uniform("f", 1.0),
   });
 
   constructor() {
@@ -71,6 +73,18 @@ export class BasicEngine {
       this.renderer.domElement
     );
     this.controls.enableDamping = true;
+
+    // 缩放监听（滚轮）
+    this.domElement.addEventListener(
+      "wheel",
+      (e: WheelEvent) => {
+        e.preventDefault();
+        const factor = Math.exp(e.deltaY * 0.0005);
+        this.zoomFactor = Math.min(10, Math.max(0.2, this.zoomFactor * factor));
+        this.uniforms.set("u_zoom", this.zoomFactor);
+      },
+      { passive: false }
+    );
   }
 
   private resize() {
