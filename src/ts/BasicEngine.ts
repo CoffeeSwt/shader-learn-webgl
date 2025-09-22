@@ -5,6 +5,8 @@ import {
   Scene,
   Vector2,
   WebGLRenderer,
+  TextureLoader,
+  Texture,
   type Camera,
 } from "three";
 
@@ -35,6 +37,7 @@ export class BasicEngine {
     u_resolution: new Uniform("v2", new Vector2()),
     u_mouse: new Uniform("v2", new Vector2()),
     u_zoom: new Uniform("f", 1.0),
+    iChannel0: new Uniform("t", new Texture()),
   });
 
   constructor() {
@@ -97,9 +100,11 @@ export class BasicEngine {
       this.domElement.offsetWidth / this.domElement.offsetHeight;
     (this.camera as PerspectiveCamera).updateProjectionMatrix();
 
+    // 使用 canvas 的实际尺寸，与 gl_FragCoord 保持一致
+    const canvas = this.renderer.domElement;
     this.uniforms.set(
       "u_resolution",
-      new Vector2(this.domElement.offsetWidth, this.domElement.offsetHeight)
+      new Vector2(canvas.width, canvas.height)
     );
   }
 

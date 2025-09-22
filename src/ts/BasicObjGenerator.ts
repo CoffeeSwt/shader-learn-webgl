@@ -48,7 +48,6 @@ export class BasicObjGenerator {
       uniforms: uniforms,
     });
     const plane = new Mesh(mesh, material);
-    plane.position.set(0, 0, 0);
     return plane;
   }
 }
