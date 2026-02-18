@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from "vue-router";
 
 export const routes: Array<RouteRecordRaw> = [
-  { path: "/", redirect: "/fractal-intro" },
+  { path: "/", redirect: "/home" },
 
   { path: "/home", name: "Home", component: () => import("@/views/Home.vue") },
   // { path: "/demo", name: "Demo", component: () => import("@/views/Demo.vue") },
@@ -50,5 +50,11 @@ export const routes: Array<RouteRecordRaw> = [
     path: "/fractal-examples",
     name: "FractalExamples",
     component: () => import("@/views/Trae/Trae.vue"),
+  },
+  // 3D Tiles相关路由
+  {
+    path: "/3d-tiles",
+    name: "3DTiles",
+    component: () => import("@/views/3Dtiles/Demo.vue"),
   },
 ];
