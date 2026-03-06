@@ -204,18 +204,17 @@ const startDragCameraKeyframe = (e: MouseEvent, keyIndex: number) => {
 <style scoped>
 .track-editor {
     pointer-events: auto;
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 8px;
+    background: transparent; /* Background handled by parent */
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 200px;
-    margin-top: auto;
+    height: 100%; /* Fill container */
     position: relative;
+    border: none; /* Border handled by parent */
 }
 
 .track-controls {
+    pointer-events: auto;
     height: 40px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;

@@ -104,7 +104,7 @@ export function useScene() {
         });
     };
 
-    const createLabel = (pos: any, title: string, desc: string, type: string, onClick?: () => void) => {
+    const createLabel = (pos: any, title: string, desc: string, type: string, userDataIndex = -1) => {
         if (!labelsContainerEl) return;
         
         const div = document.createElement('div');
@@ -116,12 +116,10 @@ export function useScene() {
 
         div.onclick = (e) => {
             e.stopPropagation();
-            if (onClick) onClick();
-            else {
-                document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
-                div.classList.add('expanded');
-                focusCamera(pos);
-            }
+            // userDataIndex logic
+            document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
+            div.classList.add('expanded');
+            focusCamera(pos);
         };
 
         labelsContainerEl.appendChild(div);
@@ -129,19 +127,63 @@ export function useScene() {
         labels.value.push({
             element: div,
             position: new THREE.Vector3(pos.x, pos.y, pos.z),
-            type: type
+            type: type,
+            userDataIndex: userDataIndex
         });
     };
 
     const addMesh = (pos: any, type: string) => {
         if (!scene.value) return;
-        let geo, color;
-        if (type === 'camera') { geo = new THREE.BoxGeometry(2, 2, 2); color = 0x3b82f6; }
-        else if (type === 'guard') { geo = new THREE.CylinderGeometry(1, 1, 4); color = 0x10b981; }
-        else { geo = new THREE.BoxGeometry(4, 2, 1); color = 0xf59e0b; }
+        let geo, material;
+        
+        // Default material
+        material = new THREE.MeshPhongMaterial({ color: 0xcccccc });
 
-        const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color: color }));
+        // Venue Specific Model Loading (Prototype Logic)
+        // Check if we have a custom model loaded for this type?
+        // For prototype, we use primitives. Real implementation would use GLTFLoader here.
+        
+        if (type === 'camera') { 
+            geo = new THREE.BoxGeometry(2, 2, 2); 
+            material = new THREE.MeshPhongMaterial({ color: 0x3b82f6 });
+        }
+        else if (type === 'guard') { 
+            geo = new THREE.CylinderGeometry(1, 1, 4); 
+            material = new THREE.MeshPhongMaterial({ color: 0x10b981 });
+        }
+        else if (type === 'barrier') { 
+            geo = new THREE.BoxGeometry(4, 2, 1); 
+            material = new THREE.MeshPhongMaterial({ color: 0xf59e0b });
+        }
+        else if (type === 'gate') {
+            // Mocking a Gate model with group of primitives? 
+            // Simplified to Box for now, but could be more complex geometry
+            geo = new THREE.BoxGeometry(3, 4, 1);
+            material = new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }); 
+        }
+        else if (type === 'scanner') {
+            geo = new THREE.BoxGeometry(2, 3, 4);
+            material = new THREE.MeshPhongMaterial({ color: 0xec4899 });
+        }
+        else if (type === 'water_barrier') {
+            geo = new THREE.CylinderGeometry(1, 1, 2, 8);
+            material = new THREE.MeshPhongMaterial({ color: 0xeab308 });
+        }
+        else if (type === 'fence') {
+            geo = new THREE.PlaneGeometry(5, 3);
+            material = new THREE.MeshPhongMaterial({ color: 0x94a3b8, side: THREE.DoubleSide, wireframe: true });
+        }
+        else { 
+            geo = new THREE.BoxGeometry(2, 2, 2); 
+            material = new THREE.MeshPhongMaterial({ color: 0x9ca3af });
+        }
+
+        const mesh = new THREE.Mesh(geo, material);
         mesh.position.set(pos.x, pos.y, pos.z);
+        
+        // Example: If it was a real model loaded via GLTF:
+        // loader.load('path/to/model.glb', (gltf) => { mesh.add(gltf.scene); });
+        
         scene.value.add(mesh);
         objects.value.push(mesh);
         return mesh;
@@ -401,33 +443,86 @@ export function useScene() {
                     mesh.visible = true;
                     if (visible) {
                         // @ts-ignore
-                        mesh.material.opacity = 1;
-                        // @ts-ignore
-                        mesh.material.transparent = false;
+                        if (mesh.material) {
+                            // @ts-ignore
+                            mesh.material.opacity = 1;
+                            // @ts-ignore
+                            mesh.material.transparent = false;
+                        } else if (mesh.children) {
+                            // Handle Group (Line objects)
+                            mesh.children.forEach((child: any) => {
+                                if (child.material) {
+                                    child.material.opacity = 1;
+                                    child.material.transparent = false;
+                                }
+                            });
+                        }
                     } else {
                         // @ts-ignore
-                        mesh.material.opacity = 0.3;
-                        // @ts-ignore
-                        mesh.material.transparent = true;
+                        if (mesh.material) {
+                            // @ts-ignore
+                            mesh.material.opacity = 0.3;
+                            // @ts-ignore
+                            mesh.material.transparent = true;
+                        } else if (mesh.children) {
+                            mesh.children.forEach((child: any) => {
+                                if (child.material) {
+                                    child.material.opacity = 0.3;
+                                    child.material.transparent = true;
+                                }
+                            });
+                        }
                     }
                 } else {
                     mesh.visible = visible;
                     // @ts-ignore
-                    mesh.material.opacity = 1;
-                    // @ts-ignore
-                    mesh.material.transparent = false;
+                    if (mesh.material) {
+                        // @ts-ignore
+                        mesh.material.opacity = 1;
+                        // @ts-ignore
+                        mesh.material.transparent = false;
+                    } else if (mesh.children) {
+                         mesh.children.forEach((child: any) => {
+                            if (child.material) {
+                                child.material.opacity = 1;
+                                child.material.transparent = false;
+                            }
+                        });
+                    }
                 }
 
-                const label = labels.value.find(l =>
-                    Math.abs(l.position.x - item.pos.x) < 0.1 &&
-                    Math.abs(l.position.z - item.pos.z) < 0.1
-                );
+                const label = labels.value.find(l => l.userDataIndex === idx);
                 if (label) {
                     label.element.style.display = visible ? 'block' : 'none';
                     if (currentMode === 'edit' && selectedObjectIndex === idx) {
                         label.element.style.display = 'block';
                         label.element.style.opacity = visible ? '1' : '0.5';
                     }
+                    // Update label position if object moved
+                    label.position.copy(mesh.position);
+                    
+                    // For line objects, position is start, but label should be at center?
+                    // rebuildSceneFromPlan sets label at center initially.
+                    // If mesh (group) moves, it moves from start pos.
+                    // So we need to offset label by center delta?
+                    // Actually, if we move the group, the center moves relative to group.
+                    // But group.position is start.
+                    // Let's re-calculate center if it's a line object?
+                    // For simplicity, if we move the group, we just stick label to group position + offset.
+                    // But group position is start.
+                    // Better: Store local offset in label? Or just re-calc.
+                    
+                    if (item.endPos) {
+                        const start = new THREE.Vector3(item.pos.x, item.pos.y, item.pos.z);
+                        const end = new THREE.Vector3(item.endPos.x, item.endPos.y, item.endPos.z);
+                        const center = start.clone().add(end.clone().sub(start).multiplyScalar(0.5));
+                        // The mesh.position matches item.pos (start)
+                        // So label should be at mesh.position + (center - start)
+                        const offset = center.sub(start);
+                        label.position.copy(mesh.position).add(offset);
+                    }
+                    
+                    label.position.y += 5; // offset
                 }
             }
         });
@@ -436,10 +531,84 @@ export function useScene() {
     const rebuildSceneFromPlan = (items: PlanItem[], mode: string, time: number) => {
         clearPlanObjects();
         items.forEach((item, idx) => {
-            const mesh = addMesh(item.pos, item.type);
-            if (mesh) {
-                mesh.userData = { isPlanObject: true, index: idx };
-                createLabel({ x: item.pos.x, y: item.pos.y + 5, z: item.pos.z }, item.label, item.desc, 'plan');
+            // Check if it's a line object (has endPos)
+            if (item.endPos && (item.type === 'fence' || item.type === 'barrier' || item.type === 'water_barrier')) {
+                // For line objects, we might create multiple meshes or one stretched mesh
+                // For simplicity in this iteration, let's just place one mesh at center and scale/rotate it
+                // Or create multiple. Let's create multiple for better look.
+                
+                const start = new THREE.Vector3(item.pos.x, item.pos.y, item.pos.z);
+                const end = new THREE.Vector3(item.endPos.x, item.endPos.y, item.endPos.z);
+                const dist = start.distanceTo(end);
+                
+                // Calculate number of items
+                const itemWidth = item.type === 'fence' ? 5 : (item.type === 'barrier' ? 4 : 2);
+                const count = Math.max(1, Math.floor(dist / itemWidth));
+                const dir = end.clone().sub(start).normalize();
+                
+                // Create a group logic? No, just create multiple meshes but link them to same item index?
+                // If we link multiple meshes to same index, selection logic needs update.
+                // Alternative: Just stretch one mesh if geometry allows.
+                // Fence is PlaneGeometry(5, 3).
+                
+                // Let's create a Group mesh for the line
+                const group = new THREE.Group();
+                group.position.copy(start);
+                
+                // Look at end
+                group.lookAt(end);
+                
+                for(let i=0; i<count; i++) {
+                    // Create individual mesh geometry
+                    // We need to call addMesh logic but add to group instead of scene
+                    // Refactor addMesh to return mesh, not add to scene if parent provided?
+                    
+                    // Let's just create geometry manually here for now
+                    let geo, mat;
+                     if (item.type === 'fence') {
+                        geo = new THREE.PlaneGeometry(5, 3);
+                        mat = new THREE.MeshPhongMaterial({ color: 0x94a3b8, side: THREE.DoubleSide, wireframe: true });
+                    } else if (item.type === 'barrier') {
+                        geo = new THREE.BoxGeometry(4, 2, 1);
+                        mat = new THREE.MeshPhongMaterial({ color: 0xf59e0b });
+                    } else {
+                        geo = new THREE.CylinderGeometry(1, 1, 2, 8);
+                        mat = new THREE.MeshPhongMaterial({ color: 0xeab308 });
+                    }
+                    
+                    const m = new THREE.Mesh(geo, mat);
+                    // Distribute along Z axis (since we lookAt, forward is -Z in Three.js? No, lookAt aligns +Z to target usually or requires care)
+                    // Actually lookAt aligns +Z to target if we use correct up vector? 
+                    // Let's assume standard: Group is at Start. 
+                    // We want to place items from 0 to dist along the line.
+                    
+                    m.position.set(0, 0, i * itemWidth + itemWidth/2); // Local Z
+                    // Rotate mesh if needed to align with line
+                    if (item.type === 'fence') {
+                        m.rotation.y = Math.PI / 2; // Plane is XY, rotate to be along Z
+                    }
+                    
+                    group.add(m);
+                }
+                
+                scene.value?.add(group);
+                objects.value.push(group as any); // Treat group as selectable object
+                
+                group.userData = { isPlanObject: true, index: idx, isGroup: true };
+                
+                // Label at center
+                const center = start.clone().add(dir.multiplyScalar(dist / 2));
+                createLabel({ x: center.x, y: center.y + 5, z: center.z }, item.label, item.desc, 'plan', idx);
+                
+            } else {
+                const mesh = addMesh(item.pos, item.type);
+                if (mesh) {
+                    if (item.scale) mesh.scale.set(item.scale.x, item.scale.y, item.scale.z);
+                    if (item.rotation) mesh.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
+                    
+                    mesh.userData = { isPlanObject: true, index: idx };
+                    createLabel({ x: item.pos.x, y: item.pos.y + 5, z: item.pos.z }, item.label, item.desc, 'plan', idx);
+                }
             }
         });
         updateSceneAtTime(time, mode);

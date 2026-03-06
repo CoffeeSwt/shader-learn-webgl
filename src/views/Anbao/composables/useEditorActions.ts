@@ -9,7 +9,12 @@ export function useEditorActions() {
     const { tempCameraTrack, tempPlanData, saveCurrentPlan, editingPlanId } = usePlans();
     const { currentMode } = useAnbaoState();
     const { currentEditorTime } = useEditorState();
-    const { selectObject } = useInteraction();
+    const { setDrawCompleteCallback, selectObject } = useInteraction();
+
+    // Init draw callback
+    setDrawCompleteCallback((type: string, start: any, end: any) => {
+        addObjectLine(type, start, end);
+    });
 
     const addCameraKeyframe = () => {
         if (!controls.value) return;
@@ -37,6 +42,29 @@ export function useEditorActions() {
         rebuildSceneFromPlan(tempPlanData, 'edit', currentEditorTime.value);
     };
 
+    const addObjectLine = (type: string, start: any, end: any) => {
+        let label = '新物体列';
+        switch (type) {
+            case 'barrier': label = '水马列'; break;
+            case 'fence': label = '铁马列'; break;
+        }
+
+        const newItem = {
+            type: type,
+            pos: { x: start.x, y: start.y, z: start.z },
+            endPos: { x: end.x, y: end.y, z: end.z },
+            label: label,
+            desc: "线性部署",
+            time: Math.floor(currentEditorTime.value),
+            scale: { x: 1, y: 1, z: 1 }
+        };
+
+        // @ts-ignore
+        const index = tempPlanData.push(newItem) - 1;
+        rebuildSceneFromPlan(tempPlanData, 'edit', currentEditorTime.value);
+        selectObject(index);
+    };
+
     const addObjectToTimeline = (type: string) => {
         if (!controls.value) return;
         const pos = {
@@ -45,14 +73,23 @@ export function useEditorActions() {
             z: Math.round(controls.value.target.z + (Math.random() * 10 - 5))
         };
 
-        const label = type === 'camera' ? '新监控' : (type === 'guard' ? '新安保' : '新围栏');
+        let label = '新物体';
+        switch (type) {
+            case 'camera': label = '新监控'; break;
+            case 'guard': label = '新安保'; break;
+            case 'barrier': label = '新水马'; break;
+            case 'gate': label = '新闸机'; break;
+            case 'scanner': label = '新安检'; break;
+            case 'fence': label = '新铁马'; break;
+        }
 
         const newItem = {
             type: type,
             pos: pos,
             label: label,
             desc: "请配置详细信息",
-            time: Math.floor(currentEditorTime.value)
+            time: Math.floor(currentEditorTime.value),
+            scale: { x: 1, y: 1, z: 1 }
         };
 
         // @ts-ignore
