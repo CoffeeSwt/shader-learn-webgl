@@ -58,6 +58,7 @@ export function useScene() {
         scn.add(dir);
 
         loadBaseScene();
+        loadLocationLabels();
 
         const helpers = new THREE.Group();
         cameraHelpersGroup.value = helpers;
@@ -90,6 +91,17 @@ export function useScene() {
         stadium.rotation.x = Math.PI / 2;
         stadium.position.y = 8;
         scene.value.add(stadium);
+    };
+
+    const loadLocationLabels = () => {
+        const locations = [
+            { pos: { x: 40, y: 5, z: 0 }, title: "主入口", desc: "场馆主要观众入口，设有8个检票闸机。" },
+            { pos: { x: -40, y: 5, z: 0 }, title: "VIP通道", desc: "贵宾及演职人员专用通道。" },
+            { pos: { x: 0, y: 15, z: 0 }, title: "中央舞台", desc: "演出核心区域，需重点防范抛物。" }
+        ];
+        locations.forEach(loc => {
+            createLabel(loc.pos, loc.title, loc.desc, 'location');
+        });
     };
 
     const createLabel = (pos: any, title: string, desc: string, type: string, onClick?: () => void) => {
