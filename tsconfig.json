@@ -1,28 +1,19 @@
 {
   "compilerOptions": {
-    "types": [
-      "vite/client"
-    ],
+    "types": ["vite/client"],
     "target": "esnext",
     "useDefineForClassFields": true,
-    "module": "node16",
-    "lib": [
-      "esnext",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["esnext", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
     /* Bundler mode */
-    "moduleResolution": "node16",
     "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
+    "moduleResolution": "node",
     "isolatedModules": true,
+    "module": "esnext",
     "noEmit": true,
     "jsx": "preserve",
     "strict": true,
@@ -36,7 +27,7 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "src/api/xhr/config.js",
-    "*.d.ts",
+    "*.d.ts"
   ],
   "exclude": ["node_modules"],
   "references": [

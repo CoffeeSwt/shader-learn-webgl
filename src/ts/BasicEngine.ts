@@ -11,8 +11,10 @@ import {
   Group,
   DirectionalLight,
   AmbientLight,
+  Object3D,
 } from "three";
 
+//@ts-ignore
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { Uniform, UniformsManager } from "@/ts/uniforms.ts";
@@ -332,7 +334,7 @@ export class BasicEngine {
    */
   public clearGeometry() {
     const objectsToRemove: (Group | Mesh)[] = [];
-    this.scene.traverse((child) => {
+    this.scene.traverse((child:Object3D) => {
       if (child instanceof Group || child instanceof Mesh) {
         if (child.name === 'fractalTree' || child.name === 'kochSnowflake') {
           objectsToRemove.push(child);

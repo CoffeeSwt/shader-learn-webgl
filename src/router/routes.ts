@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from "vue-router";
 
 export const routes: Array<RouteRecordRaw> = [
-  { path: "/", redirect: "/fractal-intro" },
+  { path: "/", redirect: "/home" },
 
   { path: "/home", name: "Home", component: () => import("@/views/Home.vue") },
   // { path: "/demo", name: "Demo", component: () => import("@/views/Demo.vue") },
@@ -36,6 +36,11 @@ export const routes: Array<RouteRecordRaw> = [
     component: () => import("@/views/Lessons/l5/L5.vue"),
   },
   {
+    path: "/lessons/fbx",
+    name: "FBX",
+    component: () => import("@/views/Lessons/fbx/FBX.vue"),
+  },
+  {
     path: "/trae",
     name: "Trae",
     component: () => import("@/views/Trae/Trae.vue"),
@@ -50,5 +55,10 @@ export const routes: Array<RouteRecordRaw> = [
     path: "/fractal-examples",
     name: "FractalExamples",
     component: () => import("@/views/Trae/Trae.vue"),
+  },
+  {
+    path: "/digital-human",
+    name: "DigitalHuman",
+    component: () => import("@/views/DigtalHuman/DigtalHuman.vue"),
   },
 ];
