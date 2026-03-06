@@ -3,8 +3,14 @@ import { ref } from 'vue';
 // Global UI state
 const currentMode = ref('dashboard');
 const showResetBtn = ref(false);
+const showDashboardPreview = ref(false);
 const currentTime = ref('12:00:00');
 const selectedObjectIndex = ref(-1);
+
+// Detail View State
+const detailViewObject = ref<any>(null); // PlanItem but circular dep
+const showDetailPopup = ref(false);
+const detailPopupPosition = ref({ x: 0, y: 0 });
 
 // Shared info content
 const infoContent = ref(`
@@ -45,13 +51,30 @@ export function useAnbaoState() {
         `;
     };
 
+    const openDetail = (item: any, position: { x: number, y: number } = { x: 0, y: 0 }) => {
+        detailViewObject.value = item;
+        showDetailPopup.value = true;
+        detailPopupPosition.value = position;
+    };
+
+    const closeDetail = () => {
+        showDetailPopup.value = false;
+        detailViewObject.value = null;
+    };
+
     return {
         currentMode,
         showResetBtn,
+        showDashboardPreview,
         currentTime,
         selectedObjectIndex,
         infoContent,
+        detailViewObject,
+        showDetailPopup,
+        detailPopupPosition,
         updateClock,
-        loadVenueInfo
+        loadVenueInfo,
+        openDetail,
+        closeDetail
     };
 }

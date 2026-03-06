@@ -87,7 +87,12 @@ export function usePlans() {
         if (!plan) return false;
         
         editingPlanId.value = planId;
-        tempPlanData.splice(0, tempPlanData.length, ...JSON.parse(JSON.stringify(plan.items || [])));
+        const items = JSON.parse(JSON.stringify(plan.items || []));
+        // Ensure IDs exist for binding
+        items.forEach((item: PlanItem) => {
+            if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
+        });
+        tempPlanData.splice(0, tempPlanData.length, ...items);
         
         // Handle sequences
         tempSequences.splice(0, tempSequences.length);

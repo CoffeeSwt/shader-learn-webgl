@@ -41,6 +41,9 @@
             <button class="tool-btn" @click="addCameraKeyframe" title="记录当前镜头视角">
                 <i class="fas fa-camera"></i>
             </button>
+            <button class="tool-btn" :class="{ active: showDashboardPreview }" @click="showDashboardPreview = !showDashboardPreview" title="预览仪表盘">
+                <i class="fas fa-chart-line"></i>
+            </button>
         </div>
 
         <div class="spacer"></div>
@@ -60,10 +63,12 @@
 import { useEditorActions } from '../../composables/useEditorActions';
 import { useInteraction } from '../../composables/useInteraction';
 import { useScene } from '../../composables/useScene';
+import { useAnbaoState } from '../../composables/useAnbaoState';
 
 const { addCameraKeyframe, addObjectToTimeline, savePlan, exitEditor } = useEditorActions();
 const { startDrawingLine } = useInteraction();
 const { resetView } = useScene();
+const { showDashboardPreview } = useAnbaoState();
 
 const startDrawLine = (type: string) => {
     startDrawingLine(type);
@@ -116,6 +121,12 @@ const startDrawLine = (type: string) => {
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+}
+
+.tool-btn.active {
+    background: #f59e0b;
+    color: white;
+    border-color: #f59e0b;
 }
 
 .tool-btn:hover {

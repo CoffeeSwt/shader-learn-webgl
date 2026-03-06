@@ -1,5 +1,16 @@
+import { DashboardConfig } from './dashboard';
+
+export interface DetailViewConfig {
+    type: 'bar' | 'pie' | 'video' | 'info';
+    title: string;
+    dataSourceId?: string; // Optional: Bind to real-time data source
+    staticData?: any;      // Optional: Static configuration/data
+    url?: string; // Optional: URL for video or static content
+}
+
 export interface PlanItem {
-    type: 'camera' | 'guard' | 'barrier' | 'gate' | 'scanner' | 'water_barrier' | 'fence';
+    id?: string; // Unique identifier for binding
+    type: string; // 'camera' | 'guard' | 'barrier' | 'gate' | 'scanner' | 'water_barrier' | 'fence';
     pos: { x: number, y: number, z: number };
     scale?: { x: number, y: number, z: number };
     rotation?: { x: number, y: number, z: number };
@@ -7,6 +18,7 @@ export interface PlanItem {
     label: string;
     desc: string;
     time: number;
+    detailView?: DetailViewConfig;
 }
 
 export interface CameraKeyframe {
@@ -30,6 +42,7 @@ export interface Plan {
     items: PlanItem[];
     cameraTrack: CameraKeyframe[]; // Default track
     sequences: AnimationSequence[]; // Multiple sequences
+    dashboard?: DashboardConfig; // Dynamic dashboard configuration
 }
 
 export interface Plans {

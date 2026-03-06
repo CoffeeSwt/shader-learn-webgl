@@ -4,18 +4,20 @@
         <AnbaoScene />
 
         <!-- UI Components -->
-        <AppliedPlanBadge />
-
+        <!-- AppliedPlanBadge removed per requirement -->
         <div id="ui-layer" :class="{ 'pointer-events-none': currentMode === 'roam' || currentMode === 'edit' }">
             <AnbaoEditor />
             <!-- ResetViewButton is handled inside AnbaoControls for dashboard mode, or toolbar for edit mode -->
-            <AnbaoHeader />
-            <AnbaoDashboard v-show="currentMode === 'dashboard'" />
+            <AnbaoHeader v-show="currentMode !== 'edit'" />
+            <AnbaoDashboard 
+                v-if="currentMode === 'dashboard' || (currentMode === 'edit' && showDashboardPreview)" 
+                :preview-mode="currentMode === 'edit'"
+            />
             <AnbaoControls />
         </div>
         
         <ToastContainer />
-
+        <ObjectDetailPopup />
         <PlayControlOverlay />
     </div>
 </template>
@@ -28,12 +30,13 @@ import AnbaoHeader from './components/AnbaoHeader.vue';
 import AnbaoDashboard from './components/AnbaoDashboard.vue';
 import AnbaoEditor from './components/AnbaoEditor.vue';
 import AnbaoControls from './components/AnbaoControls.vue';
-import AppliedPlanBadge from './components/AppliedPlanBadge.vue';
+// AppliedPlanBadge removed
 import PlayControlOverlay from './components/PlayControlOverlay.vue';
 import ToastContainer from './components/common/ToastContainer.vue';
+import ObjectDetailPopup from './components/ObjectDetailPopup.vue';
 import { useAnbaoState } from './composables/useAnbaoState';
 
-const { currentMode, loadVenueInfo } = useAnbaoState();
+const { currentMode, loadVenueInfo, showDashboardPreview } = useAnbaoState();
 const route = useRoute();
 
 

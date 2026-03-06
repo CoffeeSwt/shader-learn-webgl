@@ -6,7 +6,7 @@ import { useEditorState } from './useEditorState';
 import { ref, reactive } from 'vue';
 
 const { scene, camera, renderer, controls, objects, dragPlane } = useScene();
-const { currentMode, selectedObjectIndex } = useAnbaoState();
+const { currentMode, selectedObjectIndex, openDetail } = useAnbaoState();
 const { tempPlanData } = usePlans();
 const { currentEditorTime } = useEditorState();
 
@@ -131,7 +131,7 @@ export function useInteraction() {
     };
 
     const onSceneClick = (event: MouseEvent) => {
-        if (currentMode.value !== 'edit' || !renderer.value || !camera.value) return;
+        if (!renderer.value || !camera.value) return;
 
         const mouse = new THREE.Vector2();
         mouse.x = (event.clientX / renderer.value.domElement.clientWidth) * 2 - 1;
@@ -150,7 +150,14 @@ export function useInteraction() {
             }
 
             if (object.userData && object.userData.isPlanObject) {
-                selectObject(object.userData.index);
+                if (currentMode.value === 'edit') {
+                    selectObject(object.userData.index);
+                } else if (currentMode.value === 'dashboard') {
+                    // Open detail view
+                    const item = tempPlanData[object.userData.index];
+                    // We need screen coordinates for popup
+                    openDetail(item, { x: event.clientX, y: event.clientY });
+                }
                 event.stopPropagation();
             }
         }
