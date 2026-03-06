@@ -5,7 +5,7 @@ import { usePlans } from './usePlans';
 import { useEditorState } from './useEditorState';
 import { ref, reactive } from 'vue';
 
-const { scene, camera, renderer, controls, objects, dragPlane } = useScene();
+const { scene, camera, renderer, controls, objects, dragPlane, updateLabelContent } = useScene();
 const { currentMode, selectedObjectIndex, openDetail } = useAnbaoState();
 const { tempPlanData } = usePlans();
 const { currentEditorTime } = useEditorState();
@@ -13,6 +13,7 @@ const { currentEditorTime } = useEditorState();
 const selectedObjectPos = reactive({ x: 0, y: 0, z: 0 });
 const selectedObjectScale = reactive({ x: 1, y: 1, z: 1 });
 const selectedObjectLabel = ref('');
+const selectedObjectDesc = ref('');
 
 let isDrawingLine = false;
 let lineStartPoint: THREE.Vector3 | null = null;
@@ -65,6 +66,7 @@ export function useInteraction() {
         selectedObjectScale.z = item.scale?.z || 1;
 
         selectedObjectLabel.value = item.label;
+        selectedObjectDesc.value = item.desc || '';
     };
 
     const deselectObject = () => {
@@ -127,7 +129,9 @@ export function useInteraction() {
     const updateObjectLabel = () => {
         if (selectedObjectIndex.value === -1) return;
         tempPlanData[selectedObjectIndex.value].label = selectedObjectLabel.value;
+        tempPlanData[selectedObjectIndex.value].desc = selectedObjectDesc.value;
         // Label text update handled by Vue reactivity or manual refresh if needed
+        updateLabelContent(selectedObjectIndex.value, selectedObjectLabel.value, selectedObjectDesc.value);
     };
 
     const onSceneClick = (event: MouseEvent) => {
@@ -346,6 +350,7 @@ export function useInteraction() {
         selectedObjectPos,
         selectedObjectScale,
         selectedObjectLabel,
+        selectedObjectDesc,
         currentEditorTime,
         selectObject,
         deselectObject,

@@ -642,10 +642,20 @@ export function useScene() {
         onResetCallback = resetCb;
     };
 
+    const updateLabelContent = (index: number, title: string, desc: string) => {
+        const label = labels.value.find(l => l.userDataIndex === index);
+        if (label && label.element) {
+            label.element.innerHTML = `
+            <i class="fas ${label.type === 'plan' ? 'fa-shield-alt' : 'fa-map-marker-alt'}"></i> ${title}
+            <div class="detail">${desc}</div>
+        `;
+        }
+    };
+
     return {
         scene, camera, renderer, controls, objects, labels, dragPlane, cameraHelpersGroup,
         isAnimating, autoRotate, rotateSpeed, layers,
-        init3D, animate, addMesh, createLabel, clearPlanObjects, 
+        init3D, animate, addMesh, createLabel, updateLabelContent, clearPlanObjects, 
         focusCamera, resetView, updateCameraPathVisuals, updateSceneAtTime, rebuildSceneFromPlan,
         getCameraStateAtTime, // exported for Editor to use
         setCallbacks
