@@ -61,4 +61,9 @@ export const routes: Array<RouteRecordRaw> = [
     name: "DigitalHuman",
     component: () => import("@/views/DigtalHuman/DigtalHuman.vue"),
   },
+  {
+    path: "/3d-tiles",
+    name: "3DTiles",
+    component: () => import("@/views/3Dtiles/Demo.vue"),
+  },
 ];
