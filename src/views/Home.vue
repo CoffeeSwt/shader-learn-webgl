@@ -1,11 +1,13 @@
 <template>
-  <div size-screen flex-center gap-10>
-    <template v-for="route in routesRendered" :key="route.path">
-      <div @click="routeTo(route.path)" class="hover-line" text-gray-400 hover:text-gray-600 cursor-pointer font-mono
-        text-4xl duration-300>
-        {{ route.name }}
-      </div>
-    </template>
+  <div size-screen flex-center p-10 box-border bg-gray-900>
+    <div flex gap-20 flex-wrap>
+      <template v-for="route in routesRendered" :key="route.path">
+        <div @click="routeTo(route.path)" class="hover-line" text-gray-400 hover:text-gray-600 cursor-pointer font-mono
+          text-4xl duration-300>
+          {{ route.name }}
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
