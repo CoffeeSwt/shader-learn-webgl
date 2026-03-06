@@ -1,5 +1,5 @@
 <template>
-    <div :class="['anbao-toast', type]">
+    <div :class="['anbao-toast', type]" @click="$emit('close')">
         <div class="toast-icon">
             <i v-if="type === 'success'" class="fas fa-check-circle"></i>
             <i v-else-if="type === 'error'" class="fas fa-exclamation-circle"></i>
@@ -18,8 +18,6 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps } from 'vue';
-
 defineProps<{
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
@@ -45,6 +43,7 @@ defineProps<{
     backdrop-filter: blur(4px);
     overflow: hidden;
     pointer-events: auto;
+    cursor: pointer;
 }
 
 .anbao-toast.success { border-left-color: #10b981; }
