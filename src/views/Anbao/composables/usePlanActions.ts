@@ -1,6 +1,7 @@
 import { usePlans } from './usePlans';
 import { useScene } from './useScene';
 import { useAnbaoState } from './useAnbaoState';
+import { useToast } from './useToast';
 import { ref } from 'vue';
 
 // Global demo state
@@ -13,25 +14,24 @@ export function usePlanActions() {
     const { plans, appliedPlanId, loadPlanToEdit, createPlan: createPlanData, tempPlanData, tempCameraTrack } = usePlans();
     const { clearPlanObjects, addMesh, createLabel, updateSceneAtTime, controls, camera, isAnimating, rebuildSceneFromPlan } = useScene();
     const { currentMode, showResetBtn } = useAnbaoState();
+    const toast = useToast();
 
     const applyPlan = (planId: string) => {
         clearPlanObjects();
         appliedPlanId.value = planId;
         const items = plans[planId].items;
 
-        items.forEach((item: any) => {
-            addMesh(item.pos, item.type);
-            createLabel({ x: item.pos.x, y: item.pos.y + 5, z: item.pos.z }, item.label, item.desc, 'plan');
-        });
-
-        alert("方案 [" + plans[planId].name + "] 已加载！");
+        // Use rebuildSceneFromPlan for consistency (handles lines/groups)
+        rebuildSceneFromPlan(items, 'dashboard', 0);
+        
+        toast.success(`方案 [${plans[planId].name}] 已加载！`);
     };
 
     const cancelAppliedPlan = () => {
         if (!appliedPlanId.value) return;
         clearPlanObjects();
         appliedPlanId.value = null;
-        alert("已取消方案应用，恢复默认场景。");
+        toast.info("已取消方案应用，恢复默认场景。");
     };
 
     const refreshEditorScene = (time = 0) => {
@@ -58,7 +58,7 @@ export function usePlanActions() {
                 controls.value.target.copy(firstKey.target as any);
                 controls.value.update();
             }
-            alert("进入编辑模式: " + plans[planId].name);
+            toast.info(`进入编辑模式: ${plans[planId].name}`);
         }
     };
 
@@ -96,7 +96,7 @@ export function usePlanActions() {
         }
 
         if (!sequenceToPlay || !sequenceToPlay.track || sequenceToPlay.track.length === 0) {
-             alert("该方案没有包含任何动画序列！\n请先进入编辑模式创建镜头动画。");
+             toast.error("该方案没有包含任何动画序列！\n请先进入编辑模式创建镜头动画。");
              return;
         }
 
@@ -151,7 +151,7 @@ export function usePlanActions() {
             if (demoElapsedTime.value >= demoDuration.value) {
                 demoElapsedTime.value = demoDuration.value;
                 isAnimating.value = false; // Stop loop
-                alert("演示结束");
+                toast.info("演示结束");
                 currentMode.value = 'dashboard'; // Exit roam
                 showResetBtn.value = true;
                 return;

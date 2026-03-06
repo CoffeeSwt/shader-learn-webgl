@@ -3,6 +3,7 @@ import { usePlans } from './usePlans';
 import { useAnbaoState } from './useAnbaoState';
 import { useEditorState } from './useEditorState';
 import { useInteraction } from './useInteraction';
+import { useToast } from './useToast';
 
 export function useEditorActions() {
     const { controls, updateCameraPathVisuals, rebuildSceneFromPlan, clearPlanObjects } = useScene();
@@ -10,6 +11,7 @@ export function useEditorActions() {
     const { currentMode } = useAnbaoState();
     const { currentEditorTime } = useEditorState();
     const { setDrawCompleteCallback, selectObject } = useInteraction();
+    const toast = useToast();
 
     // Init draw callback
     setDrawCompleteCallback((type: string, start: any, end: any) => {
@@ -27,6 +29,7 @@ export function useEditorActions() {
         if (existing) {
             existing.pos = currentPos;
             existing.target = currentTarget;
+            toast.info(`更新了 ${t.toFixed(1)}s 处的关键帧`);
         } else {
             tempCameraTrack.push({
                 t: t,
@@ -34,6 +37,7 @@ export function useEditorActions() {
                 target: currentTarget
             });
             tempCameraTrack.sort((a, b) => a.t - b.t);
+            toast.success(`添加了 ${t.toFixed(1)}s 处的关键帧`);
         }
         updateCameraPathVisuals(currentMode.value);
     };
@@ -63,6 +67,7 @@ export function useEditorActions() {
         const index = tempPlanData.push(newItem) - 1;
         rebuildSceneFromPlan(tempPlanData, 'edit', currentEditorTime.value);
         selectObject(index);
+        toast.success(`已添加 ${label}`);
     };
 
     const addObjectToTimeline = (type: string) => {
@@ -98,18 +103,19 @@ export function useEditorActions() {
         // Using rebuild is safer than ad-hoc add because of index alignment
         rebuildSceneFromPlan(tempPlanData, 'edit', currentEditorTime.value);
         selectObject(index);
+        toast.success(`已添加 ${label}`);
     };
 
     const savePlan = () => {
         const savedPlan = saveCurrentPlan();
         if (savedPlan) {
             if (savedPlan.cameraTrack.length === 0) {
-                alert("警告：当前方案没有记录任何镜头关键帧！\n播放时镜头将不会移动。");
+                toast.warning("警告：当前方案没有记录任何镜头关键帧！\n播放时镜头将不会移动。");
             }
-            alert(`方案 [${savedPlan.name}] 保存成功！\n时长: ${savedPlan.duration}s\n安保点位: ${savedPlan.items.length}\n镜头关键帧: ${savedPlan.cameraTrack.length}`);
+            toast.success(`方案 [${savedPlan.name}] 保存成功！`, 3000, "保存成功");
             currentMode.value = 'dashboard';
         } else {
-            alert("错误：无法找到当前编辑的方案ID！");
+            toast.error("错误：无法找到当前编辑的方案ID！");
         }
     };
 
@@ -118,6 +124,7 @@ export function useEditorActions() {
             currentMode.value = 'dashboard';
             clearPlanObjects();
             editingPlanId.value = null;
+            toast.info("已退出编辑模式");
         }
     };
 

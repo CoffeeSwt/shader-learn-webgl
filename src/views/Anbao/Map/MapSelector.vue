@@ -14,6 +14,8 @@
     <div v-if="loading" class="loading-overlay">
       <i class="fas fa-spinner fa-spin"></i> 加载地图数据中...
     </div>
+
+    <ToastContainer />
   </div>
 </template>
 
@@ -22,7 +24,10 @@ import { ref, onMounted, onUnmounted, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
 // @ts-ignore
 import * as echarts from 'echarts';
+import ToastContainer from '../components/common/ToastContainer.vue';
+import { useToast } from '../composables/useToast';
 
+const toast = useToast();
 const router = useRouter();
 const chartContainer = ref<HTMLElement | null>(null);
 const chartInstance = shallowRef<any>(null);
@@ -107,7 +112,7 @@ const loadMap = async (adcode: number, mapName: string) => {
         renderMap(mapName, adcode);
     } catch (error) {
         console.error("Failed to load map:", error);
-        alert("地图数据加载失败，请检查网络连接。");
+        toast.error("地图数据加载失败，请检查网络连接。");
     } finally {
         loading.value = false;
     }
@@ -263,8 +268,7 @@ const handleMapClick = (params: any) => {
             if (adcode) {
                 loadMap(adcode, params.name);
             } else {
-                console.log("No detailed map for:", params.name);
-                // Optionally show a message
+                toast.info(`暂无 ${params.name} 的详细数据`);
             }
         }
     }
@@ -274,7 +278,16 @@ const backToCountry = () => {
     loadMap(100000, 'china');
 };
 
+const loadStyle = (href: string) => {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.href = href;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+}
+
 onMounted(() => {
+    loadStyle("https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css");
     initChart();
 });
 

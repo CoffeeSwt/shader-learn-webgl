@@ -1,5 +1,6 @@
 import { reactive, ref, computed } from 'vue';
 import type { Plans, PlanItem, CameraKeyframe, AnimationSequence } from '../types';
+import { useToast } from './useToast';
 
 // Singleton state
 const plans = reactive<Plans>({
@@ -64,6 +65,8 @@ const tempCameraTrack = reactive<CameraKeyframe[]>([]); // Current sequence trac
 const currentPlanDuration = ref(30);
 
 export function usePlans() {
+    const { warning } = useToast();
+
     const createPlan = () => {
         const id = 'plan_' + Date.now();
         // @ts-ignore
@@ -139,7 +142,7 @@ export function usePlans() {
 
     const removeSequence = (index: number) => {
         if (tempSequences.length <= 1) {
-            alert("至少保留一个序列");
+            warning("至少保留一个序列");
             return;
         }
         

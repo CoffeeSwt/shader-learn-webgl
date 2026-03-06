@@ -13,6 +13,8 @@
             <AnbaoDashboard v-show="currentMode === 'dashboard'" />
             <AnbaoControls />
         </div>
+        
+        <ToastContainer />
 
         <PlayControlOverlay />
     </div>
@@ -28,6 +30,7 @@ import AnbaoEditor from './components/AnbaoEditor.vue';
 import AnbaoControls from './components/AnbaoControls.vue';
 import AppliedPlanBadge from './components/AppliedPlanBadge.vue';
 import PlayControlOverlay from './components/PlayControlOverlay.vue';
+import ToastContainer from './components/common/ToastContainer.vue';
 import { useAnbaoState } from './composables/useAnbaoState';
 
 const { currentMode, loadVenueInfo } = useAnbaoState();
