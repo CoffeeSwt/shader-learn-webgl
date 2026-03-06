@@ -22,7 +22,7 @@ const layers = reactive({
 
 const isAnimating = ref(false);
 const autoRotate = ref(true);
-const rotateSpeed = ref(2);
+const rotateSpeed = ref(0.5);
 
 // Internal variables
 let labelsContainerEl: HTMLElement | null = null;

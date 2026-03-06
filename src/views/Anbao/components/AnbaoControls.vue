@@ -2,8 +2,6 @@
     <div v-show="currentMode !== 'edit'" class="center-controls-container" id="center-controls">
         <!-- Layer Control -->
         <div class="layer-control">
-            <div :class="['layer-item', { active: layers.base }]" @click="toggleLayer('base')"><i
-                    class="fas fa-map"></i> 基础底图</div>
             <div :class="['layer-item', { active: layers.location }]" @click="toggleLayer('location')"><i
                     class="fas fa-map-marker-alt"></i> 地点标签</div>
             <div :class="['layer-item', { active: layers.plan }]" @click="toggleLayer('plan')"><i

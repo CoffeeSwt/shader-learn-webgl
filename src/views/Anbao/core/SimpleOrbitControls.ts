@@ -27,7 +27,7 @@ export class SimpleOrbitControls {
         this.phi = Math.PI / 3;
         this.enabled = true;
         this.autoRotate = true;
-        this.rotateSpeed = 0.002;
+        this.rotateSpeed = 0.0005;
         this.panSpeed = 1.0;
 
         domElement.addEventListener('mousedown', e => this.onDown(e));
