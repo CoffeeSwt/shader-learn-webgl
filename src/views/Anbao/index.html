@@ -1,0 +1,2220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧安保一体化平台</title>
+    <!-- FontAwesome -->
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- ECharts -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <!-- Three.js -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Tween.js for Animation (Staticfile) -->
+    <script src="https://cdn.staticfile.org/tween.js/18.6.4/tween.umd.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --panel-bg: rgba(15, 23, 42, 0.85);
+            --primary: #3b82f6;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --text-main: #f1f5f9;
+            --border: rgba(59, 130, 246, 0.3);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #000;
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- 3D Canvas Layer --- */
+        #canvas-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            background: radial-gradient(circle at center, #1e293b 0%, #000 100%);
+        }
+
+        /* --- UI Overlay Layer --- */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            pointer-events: none; /* Pass clicks to 3D */
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .pointer-events-auto { pointer-events: auto; }
+
+        /* --- Header --- */
+        .header {
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+            margin: -20px -20px 20px -20px;
+            padding: 0 30px;
+        }
+
+        .logo { font-size: 24px; font-weight: bold; color: var(--primary); text-shadow: 0 0 10px var(--primary); }
+        .clock { font-family: monospace; color: var(--accent); font-size: 16px; }
+
+        /* --- Layout Grid --- */
+        .dashboard-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 350px 1fr 350px;
+            grid-template-rows: 1fr 1fr;
+            gap: 20px;
+            height: calc(100% - 60px);
+        }
+
+        /* --- Panels --- */
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .panel-header {
+            font-size: 14px;
+            color: var(--primary);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Specific Panel Positions */
+        .p-top-left { grid-column: 1; grid-row: 1; }
+        .p-bottom-left { grid-column: 1; grid-row: 2; }
+        .p-top-right { grid-column: 3; grid-row: 1; }
+        .p-bottom-right { grid-column: 3; grid-row: 2; }
+        
+        /* Center Area (Transparent for 3D) */
+        .p-center { 
+            grid-column: 2; 
+            grid-row: 1 / span 2; 
+            pointer-events: none; 
+            position: relative;
+        }
+
+        /* --- Labels & Markers --- */
+        .label-marker {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--primary);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            pointer-events: auto;
+            transform: translate(-50%, -100%);
+            white-space: nowrap;
+            z-index: 5;
+            transition: all 0.3s;
+        }
+        .label-marker:hover {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+        .label-marker .detail {
+            display: none;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #ddd;
+            border-top: 1px solid rgba(255,255,255,0.3);
+            padding-top: 5px;
+        }
+        .label-marker.expanded {
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.9);
+            border-color: var(--accent);
+        }
+        .label-marker.expanded .detail { display: block; }
+        
+        /* Security Plan Labels (Distinct Style) */
+        .plan-label {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(20, 10, 0, 0.8);
+        }
+        .plan-label:hover { background: var(--accent); color: black; }
+
+        /* --- Center Controls Container --- */
+        .center-controls-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 15;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .center-controls-container > * {
+            pointer-events: auto;
+            position: static !important; /* Override individual absolute positioning */
+            transform: none !important;
+            margin: 0;
+        }
+
+        /* --- Layer Control --- */
+        .layer-control {
+            background: rgba(0,0,0,0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #555;
+            display: flex;
+            gap: 15px;
+        }
+        .layer-item { font-size: 12px; color: #ccc; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .layer-item.active { color: var(--primary); font-weight: bold; }
+
+        /* --- Rotation Control --- */
+        .rotate-control {
+            background: rgba(0,0,0,0.6);
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #555;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .rotate-control input[type="range"] {
+            width: 100px;
+            accent-color: var(--primary);
+        }
+
+        /* Play Control Overlay */
+        #play-control-overlay {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none; /* Flex when playing */
+            gap: 15px;
+            pointer-events: auto;
+            z-index: 30;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid var(--primary);
+        }
+        
+        .play-ctrl-btn {
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+            transition: all 0.2s;
+        }
+        .play-ctrl-btn:hover { background: var(--primary); transform: scale(1.1); }
+        .play-ctrl-btn.danger:hover { background: var(--danger); }
+
+        /* --- Content Styling --- */
+        /* Chart Container */
+        .chart-box { flex: 1; width: 100%; min-height: 0; }
+        
+        /* Video Grid */
+        .video-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 5px;
+            flex: 1;
+        }
+        .video-feed {
+            background: #000;
+            position: relative;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        .video-feed::after {
+            content: 'LIVE'; position: absolute; top: 5px; right: 5px;
+            color: red; font-size: 10px; animation: blink 1s infinite;
+        }
+
+        /* Info Text */
+        .info-text { font-size: 12px; line-height: 1.6; color: #ccc; }
+        
+        /* Plan List */
+        .plan-list { flex: 1; overflow-y: auto; }
+        .plan-item {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .plan-item:hover { background: rgba(255,255,255,0.05); }
+        .plan-actions i { margin-left: 8px; color: #aaa; cursor: pointer; }
+        .plan-actions i:hover { color: var(--primary); }
+
+        /* Mode Switcher (In Container) */
+        .mode-switcher {
+            display: flex;
+            gap: 10px;
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        .mode-btn:hover { background: var(--primary); color: white; }
+
+        /* Reset Button */
+        .reset-btn {
+            position: absolute;
+            bottom: 180px; /* Moved up to clear controls */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(239, 68, 68, 0.8); /* Red/Danger color for reset */
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: none; /* Hidden by default */
+            pointer-events: auto;
+            z-index: 20;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+        .reset-btn:hover {
+            background: rgba(239, 68, 68, 1);
+            transform: translateX(-50%) scale(1.05);
+        }
+
+        /* --- Timeline / Track Editor --- */
+        .track-editor {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 200px;
+            margin-top: auto; /* Push to bottom */
+            position: relative;
+        }
+
+        .track-controls {
+            height: 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            gap: 15px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        .time-display {
+            font-family: monospace;
+            color: var(--primary);
+            font-size: 14px;
+            min-width: 60px;
+        }
+
+        .tracks-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            display: flex;
+        }
+
+        .track-headers {
+            width: 120px;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
+        .track-header {
+            height: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            padding-left: 10px;
+            font-size: 11px;
+            color: #ccc;
+        }
+
+        .timeline-area {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        .timeline-ruler {
+            height: 20px;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+        
+        .ruler-mark {
+            position: absolute;
+            top: 0; bottom: 0;
+            border-left: 1px solid rgba(255,255,255,0.2);
+            font-size: 9px;
+            color: #888;
+            padding-left: 2px;
+        }
+
+        .track-lane {
+            height: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            position: relative;
+        }
+
+        .keyframe {
+            position: absolute;
+            top: 5px;
+            width: 8px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 2px;
+            cursor: pointer;
+            transform: translateX(-50%);
+            z-index: 2;
+        }
+        .keyframe:hover { background: white; z-index: 3; }
+        .keyframe.camera-key { background: var(--primary); border-radius: 50%; width: 12px; height: 12px; top: 9px; }
+
+        .playhead {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: var(--danger);
+            z-index: 10;
+            pointer-events: none;
+        }
+        .playhead-handle {
+            position: absolute;
+            top: 0;
+            left: -5px;
+            width: 12px;
+            height: 12px;
+            background: var(--danger);
+            transform: rotate(45deg);
+        }
+
+        /* Applied Plan Indicator */
+        .applied-plan-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.3);
+            display: none; /* Hidden by default */
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+            z-index: 25;
+            pointer-events: auto;
+            font-size: 14px;
+        }
+        .applied-plan-indicator i { cursor: pointer; opacity: 0.8; }
+        .applied-plan-indicator i:hover { opacity: 1; transform: scale(1.1); }
+
+        /* --- Editor UI --- */
+        #editor-ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: flex-end; /* Align to bottom */
+            padding: 20px;
+            padding-bottom: 20px;
+            z-index: 20;
+        }
+        
+        .editor-toolbar {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            margin-top: 0;
+        }
+        
+        .editor-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .editor-btn:hover { background: var(--primary); }
+        .editor-btn.danger { border-color: var(--danger); color: var(--danger); }
+        .editor-btn.danger:hover { background: var(--danger); color: white; }
+
+        /* Gizmo/Drag Controls */
+        .transform-controls {
+            position: absolute;
+            bottom: 250px; /* Moved up as requested */
+            right: 20px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            display: none; /* Only in edit mode when object selected */
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: auto;
+            width: 200px;
+        }
+        .control-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+        .control-row label { color: #aaa; width: 20px; }
+        .control-row input { 
+            background: rgba(0,0,0,0.3); 
+            border: 1px solid #555; 
+            color: white; 
+            width: 50px; 
+            padding: 2px 5px; 
+            border-radius: 4px;
+        }
+        
+        .selected-object-highlight {
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <!-- 3D Background -->
+    <div id="canvas-container"></div>
+
+    <!-- Applied Plan Indicator -->
+    <div id="applied-plan-badge" class="applied-plan-indicator">
+        <i class="fas fa-check-circle"></i> 
+        <span id="applied-plan-name">当前方案: 方案A</span>
+        <i class="fas fa-times-circle" style="margin-left:10px; font-size:16px;" title="取消应用" onclick="cancelAppliedPlan()"></i>
+    </div>
+
+    <!-- UI Overlay -->
+    <div id="ui-layer">
+        <!-- Editor UI -->
+        <div id="editor-ui">
+            <div class="editor-toolbar">
+                <div style="font-weight:bold; color:var(--accent); margin-right:10px; display:flex; align-items:center;">方案编辑器</div>
+                <button class="editor-btn" onclick="addCameraKeyframe()"><i class="fas fa-camera"></i> 记录镜头</button>
+                <button class="editor-btn" onclick="addObjectToTimeline('camera')"><i class="fas fa-video"></i> 加监控</button>
+                <button class="editor-btn" onclick="addObjectToTimeline('guard')"><i class="fas fa-user-shield"></i> 加保安</button>
+                <button class="editor-btn" onclick="addObjectToTimeline('barrier')"><i class="fas fa-bars"></i> 加围栏</button>
+                <div style="width:1px; background:#555; margin:0 5px;"></div>
+                <button class="editor-btn" onclick="savePlan()"><i class="fas fa-save"></i> 保存方案</button>
+                <button class="editor-btn danger" onclick="exitEditor()"><i class="fas fa-times"></i> 退出编辑</button>
+                <div style="font-size:10px; color:#aaa; margin-left:10px; display:flex; align-items:center;">
+                    <i class="fas fa-mouse" style="margin-right:5px;"></i> 左键旋转 | 右键平移
+                </div>
+            </div>
+            
+            <!-- New Track Editor -->
+            <div class="track-editor">
+                <div class="track-controls">
+                    <button class="editor-btn" onclick="togglePlayEditor()"><i class="fas" id="play-icon"></i> <span id="play-text">播放预览</span></button>
+                    <button class="editor-btn" onclick="stopEditor()"><i class="fas fa-stop"></i> 停止</button>
+                    <div class="time-display" id="time-display">00:00.0</div>
+                    
+                    <div style="flex:1;"></div>
+                    
+                    <!-- Duration Control -->
+                    <div style="display:flex; align-items:center; gap:5px; margin-right:15px; font-size:12px; color:#888;">
+                        <span>总时长(s):</span>
+                        <input type="number" id="plan-duration" value="30" min="5" max="120" style="width:50px; background:rgba(0,0,0,0.3); border:1px solid #555; color:white; padding:2px 5px; border-radius:4px;" onchange="updateDuration(this.value)">
+                    </div>
+                </div>
+                <div class="tracks-container">
+                    <div class="track-headers" id="track-headers">
+                        <div class="track-header" style="height:20px;"></div> <!-- Ruler spacer -->
+                        <div class="track-header">镜头轨道</div>
+                        <!-- Dynamic Object Headers -->
+                    </div>
+                    <div class="timeline-area" id="timeline-area" onmousedown="startScrub(event)">
+                        <div class="timeline-ruler" id="timeline-ruler">
+                            <!-- Ruler Marks -->
+                        </div>
+                        <div id="track-lanes">
+                            <div class="track-lane" id="camera-lane"></div>
+                            <!-- Dynamic Object Lanes -->
+                        </div>
+                        <div class="playhead" id="playhead">
+                            <div class="playhead-handle"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Object Transform Controls -->
+            <div id="transform-controls" class="transform-controls">
+                <div class="panel-header">
+                    <span><i class="fas fa-arrows-alt"></i> 调整位置</span>
+                    <i class="fas fa-times" style="cursor:pointer;" onclick="deselectObject()"></i>
+                </div>
+                <div class="control-row">
+                    <label>X</label> <input type="number" id="pos-x" step="1" onchange="updateObjectPos()">
+                </div>
+                <div class="control-row">
+                    <label>Y</label> <input type="number" id="pos-y" step="1" onchange="updateObjectPos()">
+                </div>
+                <div class="control-row">
+                    <label>Z</label> <input type="number" id="pos-z" step="1" onchange="updateObjectPos()">
+                </div>
+                <div class="control-row" style="margin-top:5px; border-top:1px solid #333; padding-top:5px;">
+                    <label style="width:auto;">标签:</label>
+                    <input type="text" id="obj-label" style="width:100px;" onchange="updateObjectLabel()">
+                </div>
+                <p style="font-size:10px; color:#888; margin-top:5px;">* 也可以在场景中直接拖拽(TODO)</p>
+            </div>
+        </div>
+
+        <!-- Reset Button -->
+        <div id="reset-btn" class="reset-btn" onclick="resetView()">
+            <i class="fas fa-undo"></i> 重置视角
+        </div>
+
+        <div class="header pointer-events-auto">
+            <div class="logo"><i class="fas fa-shield-alt"></i> 智慧安保指挥平台</div>
+            <div class="clock" id="clock">12:00:00</div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Top Left: Traffic -->
+            <div class="panel p-top-left pointer-events-auto" id="panel-traffic">
+                <div class="panel-header">
+                    <span><i class="fas fa-chart-area"></i> 人流密度监控</span>
+                    <span style="font-size:10px; color:var(--accent)">高密度预警</span>
+                </div>
+                <div id="chart-traffic" class="chart-box"></div>
+            </div>
+
+            <!-- Bottom Left: Video -->
+            <div class="panel p-bottom-left pointer-events-auto" id="panel-video">
+                <div class="panel-header">
+                    <span><i class="fas fa-video"></i> 实时监控</span>
+                </div>
+                <div class="video-grid">
+                    <div class="video-feed"></div>
+                    <div class="video-feed"></div>
+                    <div class="video-feed"></div>
+                    <div class="video-feed"></div>
+                </div>
+            </div>
+
+            <!-- Center: Spacer -->
+            <div class="p-center"></div>
+
+            <!-- Top Right: Info -->
+            <div class="panel p-top-right pointer-events-auto" id="panel-info">
+                <div class="panel-header">
+                    <span><i class="fas fa-info-circle"></i> 场馆/标签信息</span>
+                </div>
+                <div class="info-text" id="info-content">
+                    <p><strong>当前场馆：</strong> 奥体中心主体育场</p>
+                    <p><strong>活动名称：</strong> 年度全明星演唱会</p>
+                    <p><strong>预计人数：</strong> 45,000 人</p>
+                    <hr style="border:0; border-top:1px dashed #333; margin:10px 0;">
+                    <p style="font-size:11px; color:#888;">
+                        请点击场景中的标签查看详细信息。
+                    </p>
+                </div>
+            </div>
+
+            <!-- Bottom Right: Plans -->
+            <div class="panel p-bottom-right pointer-events-auto" id="panel-plans">
+                <div class="panel-header">
+                    <span><i class="fas fa-clipboard-list"></i> 安保方案管理</span>
+                    <i class="fas fa-plus-circle" style="cursor:pointer; color:var(--primary)" title="新建方案" onclick="createPlan()"></i>
+                </div>
+                <div class="plan-list" id="plan-list-container">
+                    <!-- Plans injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Controls Container -->
+        <div class="center-controls-container" id="center-controls">
+            <!-- Layer Control -->
+            <div class="layer-control">
+                <div class="layer-item active" onclick="toggleLayer('base', this)"><i class="fas fa-map"></i> 基础底图</div>
+                <div class="layer-item active" onclick="toggleLayer('location', this)"><i class="fas fa-map-marker-alt"></i> 地点标签</div>
+                <div class="layer-item" onclick="toggleLayer('plan', this)"><i class="fas fa-shield-alt"></i> 安保方案</div>
+            </div>
+
+            <!-- Rotation Control -->
+            <div class="rotate-control" id="rotate-ui">
+                <label><input type="checkbox" id="auto-rotate-check" checked onchange="toggleAutoRotate()"> 自动巡航</label>
+                <span style="border-left:1px solid #555; height:15px; margin:0 5px;"></span>
+                <i class="fas fa-tachometer-alt"></i>
+                <input type="range" min="1" max="10" value="2" oninput="setRotateSpeed(this.value)">
+            </div>
+
+            <!-- Mode Switcher -->
+            <div class="mode-switcher">
+                <button class="mode-btn" onclick="setMode('dashboard')">指挥看板</button>
+                <button class="mode-btn" onclick="setMode('roam')">自由漫游</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Play Control Overlay (For Demo) -->
+    <div id="play-control-overlay">
+        <div class="play-ctrl-btn" onclick="toggleDemoPause()" title="暂停/继续">
+            <i class="fas fa-pause" id="demo-pause-icon"></i>
+        </div>
+        <div class="play-ctrl-btn danger" onclick="stopDemo()" title="停止演示">
+            <i class="fas fa-stop"></i>
+        </div>
+        <div style="color:white; font-size:12px; display:flex; align-items:center; margin-left:10px;">
+            <span id="demo-time">00:00</span> / <span id="demo-total">00:30</span>
+        </div>
+    </div>
+
+    <!-- HTML Labels Container -->
+    <div id="labels-container"></div>
+
+    <script>
+        // --- 3D Core ---
+        class SimpleOrbitControls {
+            constructor(camera, domElement) {
+                this.camera = camera;
+                this.domElement = domElement;
+                this.target = new THREE.Vector3(0, 0, 0);
+                this.isDragging = false;
+                this.state = 'NONE'; // NONE, ROTATE, PAN
+                this.prevPos = { x: 0, y: 0 };
+                this.radius = 150;
+                this.theta = Math.PI/4;
+                this.phi = Math.PI/3;
+                this.enabled = true;
+                this.autoRotate = true;
+                this.rotateSpeed = 0.002;
+                this.panSpeed = 1.0;
+
+                domElement.addEventListener('mousedown', e => this.onDown(e));
+                window.addEventListener('mousemove', e => this.onMove(e));
+                window.addEventListener('mouseup', () => {
+                    this.isDragging = false;
+                    this.state = 'NONE';
+                });
+                domElement.addEventListener('wheel', e => this.onWheel(e));
+                domElement.addEventListener('contextmenu', e => e.preventDefault());
+            }
+            onDown(e) {
+                if(!this.enabled) return;
+                if(e.target !== this.domElement && !e.target.classList.contains('label-marker')) return;
+                
+                this.isDragging = true;
+                this.prevPos = { x: e.clientX, y: e.clientY };
+
+                if(e.button === 0) { // Left Click
+                    this.state = 'ROTATE';
+                } else if(e.button === 2) { // Right Click
+                    this.state = 'PAN';
+                }
+            }
+            onMove(e) {
+                if(!this.isDragging || !this.enabled) return;
+                const dx = e.clientX - this.prevPos.x;
+                const dy = e.clientY - this.prevPos.y;
+
+                if(this.state === 'ROTATE') {
+                    this.theta -= dx * 0.005;
+                    this.phi -= dy * 0.005;
+                    this.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.1, this.phi));
+                } else if(this.state === 'PAN') {
+                    this.pan(-dx, dy);
+                }
+
+                this.update();
+                this.prevPos = { x: e.clientX, y: e.clientY };
+            }
+            pan(deltaX, deltaY) {
+                const offset = new THREE.Vector3().copy(this.camera.position).sub(this.target);
+                const targetDistance = offset.length();
+                
+                // Pan speed scales with distance
+                targetDistance * Math.tan( ( this.camera.fov / 2 ) * Math.PI / 180.0 );
+                const factor = 2 * targetDistance * Math.tan((this.camera.fov/2) * Math.PI/180) / this.domElement.clientHeight;
+                
+                const vX = new THREE.Vector3();
+                const vY = new THREE.Vector3();
+                
+                // Get local camera axes
+                vX.setFromMatrixColumn(this.camera.matrix, 0); // Right
+                vY.setFromMatrixColumn(this.camera.matrix, 1); // Up
+                
+                vX.multiplyScalar(deltaX * factor);
+                vY.multiplyScalar(deltaY * factor);
+                
+                this.target.add(vX);
+                this.target.add(vY);
+            }
+            onWheel(e) {
+                if(!this.enabled) return;
+                this.radius += e.deltaY * 0.1;
+                this.radius = Math.max(1, Math.min(500, this.radius)); // Increased range
+                this.update();
+            }
+            update() {
+                this.camera.position.x = this.target.x + this.radius * Math.sin(this.phi) * Math.sin(this.theta);
+                this.camera.position.y = this.target.y + this.radius * Math.cos(this.phi);
+                this.camera.position.z = this.target.z + this.radius * Math.sin(this.phi) * Math.cos(this.theta);
+                this.camera.lookAt(this.target);
+            }
+        }
+
+        let scene, camera, renderer, controls;
+        let objects = []; // 3D Objects
+        let labels = [];  // HTML Labels
+        let currentMode = 'dashboard';
+        let isAnimating = false;
+        let editingPlanId = null;
+        let appliedPlanId = null; // Track currently applied plan
+        let tempPlanData = [];
+        let selectedObjectIndex = -1;
+        let dragPlane;
+        let cameraHelpersGroup; // Group for path visualization
+
+
+        // Plan Data
+        const plans = {
+            'plan1': {
+                name: "常规安保方案 A",
+                duration: 16,
+                cameraTrack: [
+                    // 1. 开场：高空鸟瞰全场（交代环境）
+                    { t: 0, pos: {x:120, y:120, z:120}, target: {x:0, y:0, z:0} },
+                    // 2. 俯冲：快速推进至主入口上方（准备部署监控）
+                    { t: 3, pos: {x:40, y:20, z:40}, target: {x:30, y:2, z:30} },
+                    // 3. 环绕：小幅度旋转，展示监控视野覆盖
+                    { t: 5, pos: {x:20, y:15, z:40}, target: {x:30, y:2, z:30} },
+                    // 4. 降落：切入地面视角，看向安保岗位置（模拟人员视角）
+                    { t: 7, pos: {x:0, y:5, z:0}, target: {x:-20, y:2, z:-20} },
+                    // 5. 仰视：低角度仰拍安保人员，体现威严感
+                    { t: 9, pos: {x:-15, y:2, z:-10}, target: {x:-20, y:4, z:-20} },
+                    // 6. 侧移：平移至围栏区域，保持低空飞行
+                    { t: 11, pos: {x:15, y:8, z:50}, target: {x:0, y:1, z:40} },
+                    // 7. 结尾：螺旋上升拉远，展示最终防御阵型
+                    { t: 16, pos: {x:0, y:150, z:100}, target: {x:0, y:0, z:0} }
+                ],
+                items: [
+                    { 
+                        type: 'camera', 
+                        pos: {x:30, y:2, z:30}, 
+                        label: "入口监控1", 
+                        desc: "覆盖主入口区域",
+                        time: 3.5 // 镜头到位后出现
+                    },
+                    { type: 'guard', pos: {x:-20, y:2, z:-20}, label: "安保岗A", desc: "车辆引导", time: 7.5 },
+                    { type: 'barrier', pos: {x:0, y:1, z:40}, label: "限流围栏", desc: "防止人流", time: 11.5 }
+                ]
+            },
+            'plan2': {
+                name: "VIP特勤方案 B",
+                duration: 13,
+                cameraTrack: [
+                     // 1. 侧面远景切入
+                     { t: 0, pos: {x:-80, y:30, z:0}, target: {x:0, y:10, z:0} },
+                     // 2. 急速推进到VIP通道特写
+                     { t: 2.5, pos: {x:40, y:5, z:0}, target: {x:50, y:2, z:0} },
+                     // 3. 极近距离侧看监控
+                     { t: 4.5, pos: {x:45, y:8, z:15}, target: {x:50, y:2, z:0} },
+                     // 4. 转向特勤小组，准备环绕
+                     { t: 6, pos: {x:30, y:6, z:15}, target: {x:40, y:2, z:0} },
+                     // 5. 环绕特勤小组 (Matrix风格)
+                     { t: 9, pos: {x:30, y:6, z:-15}, target: {x:40, y:2, z:0} },
+                     // 6. 垂直拉高俯视，展示无死角覆盖
+                     { t: 13, pos: {x:45, y:100, z:0}, target: {x:45, y:0, z:0} }
+                ],
+                items: [
+                    { type: 'camera', pos: {x:50, y:2, z:0}, label: "VIP通道监控", desc: "高精度全景", time: 2.5 },
+                    { type: 'guard', pos: {x:40, y:2, z:0}, label: "特勤小组", desc: "3人小组", time: 6.5 }
+                ]
+            }
+        };
+
+        // Editor State
+        let currentEditorTime = 0;
+        let isEditorPlaying = false;
+        let editorStartTime = 0;
+        let currentPlanDuration = 30; // Seconds
+
+        // Location Markers (Base Layer)
+        const locations = [
+            { pos: {x:40, y:5, z:0}, title: "主入口", desc: "场馆主要观众入口，设有8个检票闸机。" },
+            { pos: {x:-40, y:5, z:0}, title: "VIP通道", desc: "贵宾及演职人员专用通道。" },
+            { pos: {x:0, y:15, z:0}, title: "中央舞台", desc: "演出核心区域，需重点防范抛物。" }
+        ];
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.002);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new SimpleOrbitControls(camera, renderer.domElement);
+            controls.update();
+
+            // Lighting
+            const amb = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(amb);
+            const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+            dir.position.set(50, 100, 50);
+            scene.add(dir);
+
+            // Scene Objects
+            loadBaseScene();
+            
+            // Camera Path Visualization Group
+            cameraHelpersGroup = new THREE.Group();
+            scene.add(cameraHelpersGroup);
+            
+            // Drag Plane (Invisible)
+            dragPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(500, 500),
+                new THREE.MeshBasicMaterial({ visible: false })
+            );
+            dragPlane.rotation.x = -Math.PI / 2;
+            dragPlane.position.y = 0; // Ground level
+            scene.add(dragPlane);
+            
+            // Raycaster for object selection
+            renderer.domElement.addEventListener('click', onSceneClick);
+            
+            // Drag Logic
+            setupDragControls();
+
+            animate();
+            
+            // Init Charts
+            initCharts();
+            updateClock();
+            
+            // Initial Labels
+            loadLocationLabels();
+
+            // Render Plan List
+            renderPlanList();
+        }
+
+        function loadBaseScene() {
+            // Grid
+            const grid = new THREE.GridHelper(200, 50, 0x3b82f6, 0x1e293b);
+            scene.add(grid);
+
+            // Ground
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(200,200), new THREE.MeshPhongMaterial({color:0x0f172a, side:THREE.DoubleSide}));
+            plane.rotation.x = -Math.PI/2;
+            scene.add(plane);
+
+            // Stadium Mock
+            const stadium = new THREE.Mesh(
+                new THREE.TorusGeometry(50, 15, 16, 100),
+                new THREE.MeshPhongMaterial({color: 0x3b82f6, transparent:true, opacity:0.6, wireframe:true})
+            );
+            stadium.rotation.x = Math.PI/2;
+            stadium.position.y = 8;
+            scene.add(stadium);
+        }
+
+        function loadLocationLabels() {
+            locations.forEach(loc => {
+                createLabel(loc.pos, loc.title, loc.desc, 'location');
+            });
+        }
+
+        function createLabel(pos, title, desc, type) {
+            const div = document.createElement('div');
+            div.className = `label-marker ${type === 'plan' ? 'plan-label' : ''}`;
+            div.innerHTML = `
+                <i class="fas ${type === 'plan' ? 'fa-shield-alt' : 'fa-map-marker-alt'}"></i> ${title}
+                <div class="detail">${desc}</div>
+            `;
+            
+            // Click Handler
+            div.onclick = (e) => {
+                e.stopPropagation();
+                // Collapse others
+                document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
+                // Expand this
+                div.classList.add('expanded');
+                
+                // Move Camera
+                focusCamera(pos);
+
+                // Show Reset Button
+                document.getElementById('reset-btn').style.display = 'block';
+
+                // Update Info Panel
+                document.getElementById('info-content').innerHTML = `
+                    <h3 style="color:${type==='plan'?'var(--accent)':'var(--primary)'}">${title}</h3>
+                    <p style="margin-top:10px; font-size:13px; color:#ddd;">${desc}</p>
+                    <p style="margin-top:5px; font-size:12px; color:#888;">坐标: [${pos.x}, ${pos.y}, ${pos.z}]</p>
+                `;
+            };
+
+            document.getElementById('labels-container').appendChild(div);
+            
+            labels.push({
+                element: div,
+                position: new THREE.Vector3(pos.x, pos.y, pos.z),
+                type: type
+            });
+        }
+
+        function updateLabels() {
+            labels.forEach(label => {
+                const vector = label.position.clone();
+                vector.project(camera);
+
+                const x = (vector.x * .5 + .5) * renderer.domElement.clientWidth;
+                const y = (-(vector.y * .5) + .5) * renderer.domElement.clientHeight;
+
+                // Hide if behind camera
+                if(vector.z > 1) {
+                    label.element.style.display = 'none';
+                } else {
+                    label.element.style.display = 'block';
+                    label.element.style.left = x + 'px';
+                    label.element.style.top = y + 'px';
+                }
+            });
+        }
+
+        function clearPlanObjects() {
+            // Remove Plan Meshes
+            for(let i = objects.length - 1; i >= 0; i--) {
+                scene.remove(objects[i]);
+            }
+            objects = [];
+            
+            // Remove Plan Labels
+            labels = labels.filter(l => {
+                if(l.type === 'plan') {
+                    l.element.remove();
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function renderPlanList() {
+            const container = document.getElementById('plan-list-container');
+            container.innerHTML = '';
+            
+            Object.keys(plans).forEach(id => {
+                const plan = plans[id];
+                const div = document.createElement('div');
+                div.className = 'plan-item';
+                
+                const isApplied = (id === appliedPlanId);
+                const appliedClass = isApplied ? 'color:var(--primary);' : '';
+                const applyIcon = isApplied ? 'fa-ban' : 'fa-check-circle';
+                const applyTitle = isApplied ? '取消应用' : '应用方案';
+                const applyAction = isApplied ? `cancelAppliedPlan()` : `applyPlan('${id}')`;
+                const applyStyle = isApplied ? 'color:var(--danger);' : '';
+
+                div.innerHTML = `
+                    <span style="${appliedClass}">${plan.name} <small style="color:#666; font-size:10px;">(${plan.duration||30}s)</small> ${isApplied?'(当前)':''}</span>
+                    <div class="plan-actions">
+                        <i class="fas fa-edit" title="编辑" onclick="editPlan('${id}')"></i>
+                        <i class="fas ${applyIcon}" title="${applyTitle}" style="${applyStyle}" onclick="${applyAction}"></i>
+                        <i class="fas fa-play" title="演示" onclick="playDemo('${id}')"></i>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function applyPlan(planId) {
+            clearPlanObjects();
+            appliedPlanId = planId;
+            const items = plans[planId].items;
+            
+            items.forEach(item => {
+                // Add Mesh
+                addMesh(item.pos, item.type);
+                // Add Label
+                createLabel({x:item.pos.x, y:item.pos.y+5, z:item.pos.z}, item.label, item.desc, 'plan');
+            });
+            
+            // Show Indicator
+            const badge = document.getElementById('applied-plan-badge');
+            document.getElementById('applied-plan-name').innerText = plans[planId].name;
+            badge.style.display = 'flex';
+
+            renderPlanList();
+            alert("方案 [" + plans[planId].name + "] 已加载！");
+        }
+
+        function cancelAppliedPlan() {
+            if(!appliedPlanId) return;
+            
+            clearPlanObjects();
+            appliedPlanId = null;
+            
+            // Hide Indicator
+            document.getElementById('applied-plan-badge').style.display = 'none';
+            
+            renderPlanList();
+            alert("已取消方案应用，恢复默认场景。");
+        }
+
+        function addMesh(pos, type) {
+            let geo, color;
+            if(type === 'camera') { geo = new THREE.BoxGeometry(2,2,2); color = 0x3b82f6; }
+            else if(type === 'guard') { geo = new THREE.CylinderGeometry(1,1,4); color = 0x10b981; }
+            else { geo = new THREE.BoxGeometry(4,2,1); color = 0xf59e0b; }
+            
+            const mesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({color:color}));
+            mesh.position.set(pos.x, pos.y, pos.z);
+            scene.add(mesh);
+            objects.push(mesh);
+            return mesh;
+        }
+
+        // --- Animation Demo ---
+        function playDemo(planId) {
+             console.log("Playing Demo:", planId);
+             // Load Data
+             const plan = plans[planId];
+             if(!plan) {
+                 alert("找不到方案：" + planId);
+                 return;
+             }
+             
+             // Ensure valid duration
+             demoDuration = (plan.duration && !isNaN(plan.duration) && plan.duration > 0) ? plan.duration : 30;
+             console.log("Demo Duration:", demoDuration);
+             demoPlanId = planId;
+
+             tempPlanData = JSON.parse(JSON.stringify(plan.items || []));
+             tempCameraTrack = JSON.parse(JSON.stringify(plan.cameraTrack || []));
+             
+             console.log("Loaded Track:", tempCameraTrack.length, "frames");
+             
+             // If no camera track, use current camera position as static "track" to avoid crash
+             if(tempCameraTrack.length === 0) {
+                console.warn("No camera track found for this plan. Using static camera.");
+                // Add a single keyframe at t=0
+                tempCameraTrack.push({
+                    t: 0,
+                    pos: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+                    target: { x: controls.target.x, y: controls.target.y, z: controls.target.z }
+                });
+             }
+
+             // Setup Scene
+             clearPlanObjects();
+             tempPlanData.forEach((item, idx) => {
+                 const mesh = addMesh(item.pos, item.type);
+                 mesh.userData = { isPlanObject: true, index: idx };
+                 // Create label but initially hide if needed
+                 createLabel({x:item.pos.x, y:item.pos.y+5, z:item.pos.z}, item.label, item.desc, 'plan');
+             });
+             
+             isAnimating = true;
+             setMode('roam');
+             document.getElementById('reset-btn').style.display = 'none';
+             
+             // Show Demo Controls
+             const ctrl = document.getElementById('play-control-overlay');
+             ctrl.style.display = 'flex';
+             document.getElementById('demo-total').innerText = formatTime(demoDuration);
+             
+             // Start Playback
+             isDemoPaused = false;
+             document.getElementById('demo-pause-icon').className = 'fas fa-pause';
+             demoElapsedTime = 0;
+             lastFrameTime = Date.now();
+             
+             requestAnimationFrame(runDemoFrame);
+        }
+
+        function runDemoFrame() {
+            if(!isAnimating) return;
+            
+            const now = Date.now();
+            const delta = (now - lastFrameTime) / 1000;
+            lastFrameTime = now;
+            
+            if(!isDemoPaused) {
+                demoElapsedTime += delta;
+                
+                // Update Time Display
+                document.getElementById('demo-time').innerText = formatTime(demoElapsedTime);
+                
+                if(demoElapsedTime >= demoDuration) {
+                    demoElapsedTime = demoDuration;
+                    stopDemo();
+                    alert("演示结束");
+                    return;
+                }
+                
+                updateSceneAtTime(demoElapsedTime);
+            }
+            
+            requestAnimationFrame(runDemoFrame);
+        }
+        
+        function toggleDemoPause() {
+            isDemoPaused = !isDemoPaused;
+            const icon = document.getElementById('demo-pause-icon');
+            icon.className = isDemoPaused ? 'fas fa-play' : 'fas fa-pause';
+            // Update lastFrameTime on resume to avoid jump
+            if(!isDemoPaused) lastFrameTime = Date.now();
+        }
+        
+        function stopDemo() {
+            isAnimating = false;
+            document.getElementById('play-control-overlay').style.display = 'none';
+            setMode('dashboard');
+            
+            // Show reset button if objects are left
+             // Show Reset Button if a label is still expanded (which it likely is)
+            const expanded = document.querySelector('.label-marker.expanded');
+            if(expanded) {
+                document.getElementById('reset-btn').style.display = 'block';
+            }
+        }
+        
+        function formatTime(t) {
+            const s = Math.floor(t);
+            const ms = Math.floor((t - s) * 10);
+            return s.toString().padStart(2,'0') + ':' + ms + '0'; // Fake ms visual
+        }
+
+        function focusCamera(targetPos, duration = 1000, callback) {
+            // Stop auto-rotation when focusing
+            controls.autoRotate = false;
+            const checkbox = document.getElementById('auto-rotate-check');
+            if(checkbox) checkbox.checked = false;
+            
+            // Show Reset Button when focused
+            document.getElementById('reset-btn').style.display = 'block';
+
+            // Clone current target to avoid reference issues
+            const startTarget = { x: controls.target.x, y: controls.target.y, z: controls.target.z };
+            
+            // Tween Target
+            new TWEEN.Tween(startTarget)
+                .to({x: targetPos.x, y: targetPos.y, z: targetPos.z}, duration)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    controls.target.set(startTarget.x, startTarget.y, startTarget.z);
+                })
+                .start();
+                
+            // Tween Camera Position (Radius & Theta)
+            new TWEEN.Tween(controls)
+                .to({radius: 40, theta: controls.theta + 0.5}, duration) 
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    controls.update(); // Re-calculate camera position based on new radius/theta/target
+                })
+                .onComplete(() => {
+                    if(callback) callback();
+                })
+                .start();
+        }
+
+        // --- Reset View ---
+        function resetView() {
+            // Hide Reset Button
+            document.getElementById('reset-btn').style.display = 'none';
+            
+            // Collapse Labels
+            document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
+
+            // Reset Info Panel
+            document.getElementById('info-content').innerHTML = `
+                <p><strong>当前场馆：</strong> 奥体中心主体育场</p>
+                <p><strong>活动名称：</strong> 年度全明星演唱会</p>
+                <p><strong>预计人数：</strong> 45,000 人</p>
+                <hr style="border:0; border-top:1px dashed #333; margin:10px 0;">
+                <p style="font-size:11px; color:#888;">
+                    请点击场景中的标签查看详细信息。
+                </p>
+            `;
+
+            // Reset Camera
+            // SimpleOrbitControls defaults: radius=150, theta=PI/4, phi=PI/3, target=(0,0,0)
+            const targetPos = {x:0, y:0, z:0};
+            const duration = 1500;
+
+            // Tween Target back to 0,0,0
+            const startTarget = { x: controls.target.x, y: controls.target.y, z: controls.target.z };
+            new TWEEN.Tween(startTarget)
+                .to(targetPos, duration)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    controls.target.set(startTarget.x, startTarget.y, startTarget.z);
+                })
+                .start();
+
+            // Tween Camera Position (Radius, Theta, Phi)
+            new TWEEN.Tween(controls)
+                .to({
+                    radius: 150,
+                    theta: Math.PI/4,
+                    phi: Math.PI/3
+                }, duration)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .onUpdate(() => {
+                    controls.update();
+                })
+                .onComplete(() => {
+                    // Resume Auto Rotate if checked
+                    controls.autoRotate = true;
+                    const checkbox = document.getElementById('auto-rotate-check');
+                    if(checkbox) checkbox.checked = true;
+                })
+                .start();
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update(time);
+            
+            // Rotate in dashboard mode
+            if(currentMode === 'dashboard' && !controls.isDragging && !isAnimating && controls.autoRotate) {
+                controls.theta += controls.rotateSpeed;
+                controls.update();
+            }
+            
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+
+        // --- UI Logic ---
+        // --- Editor Logic ---
+        function createPlan() {
+            const id = 'plan_' + Date.now();
+            plans[id] = { name: "新建安保方案", items: [] };
+            renderPlanList(); // Refresh list to show new plan
+            editPlan(id);
+        }
+
+        function editPlan(planId) {
+            const plan = plans[planId];
+            if(!plan) return;
+            
+            editingPlanId = planId;
+            
+            // 1. Deep Copy Plan Data
+            tempPlanData = JSON.parse(JSON.stringify(plan.items || []));
+            // Ensure cameraTrack is loaded, or init empty array
+            tempCameraTrack = JSON.parse(JSON.stringify(plan.cameraTrack || []));
+            
+            // 2. Set Duration
+            currentPlanDuration = plan.duration || 30;
+            const durationInput = document.getElementById('plan-duration');
+            if(durationInput) durationInput.value = currentPlanDuration;
+            
+            // 3. Enter Editor Mode
+            setMode('edit');
+            currentEditorTime = 0;
+            isEditorPlaying = false;
+            selectedObjectIndex = -1;
+            
+            // 4. Render UI
+            refreshEditorScene();
+            renderTrackTimeline();
+            updateTimeDisplay(0);
+            document.getElementById('playhead').style.left = '0%';
+            
+            // 5. Initial Camera State (if exists)
+            if(tempCameraTrack.length > 0) {
+                const firstKey = tempCameraTrack[0];
+                controls.camera.position.copy(firstKey.pos);
+                controls.target.copy(firstKey.target);
+                controls.update();
+                // syncControlsToCamera(); // Let controls dictate
+            }
+            
+            alert("进入编辑模式: " + plans[planId].name);
+        }
+
+        // --- New Track Timeline Functions ---
+        let tempCameraTrack = [];
+
+        function renderTrackTimeline() {
+            const trackHeaders = document.getElementById('track-headers');
+            const trackLanes = document.getElementById('track-lanes');
+            const ruler = document.getElementById('timeline-ruler');
+            
+            // Clear Dynamic Content (Keep Ruler Header and Camera Header)
+            // But for simplicity, let's just rebuild mostly
+            
+            // 1. Ruler
+            ruler.innerHTML = '';
+            for(let i=0; i<=currentPlanDuration; i+=5) {
+                const mark = document.createElement('div');
+                mark.className = 'ruler-mark';
+                mark.style.left = (i / currentPlanDuration * 100) + '%';
+                mark.innerText = i + 's';
+                ruler.appendChild(mark);
+            }
+
+            // 2. Camera Track
+            const cameraLane = document.getElementById('camera-lane');
+            cameraLane.innerHTML = '';
+            tempCameraTrack.forEach((key, idx) => {
+                const kf = document.createElement('div');
+                kf.className = 'keyframe camera-key';
+                kf.style.left = (key.t / currentPlanDuration * 100) + '%';
+                kf.title = `Camera: ${key.t}s\nPos: [${Math.round(key.pos.x)},${Math.round(key.pos.y)},${Math.round(key.pos.z)}]\nTarget: [${Math.round(key.target.x)},${Math.round(key.target.y)},${Math.round(key.target.z)}]`;
+                
+                // Click to jump
+                kf.onclick = (e) => {
+                    e.stopPropagation();
+                    jumpToTime(key.t);
+                    controls.camera.position.set(key.pos.x, key.pos.y, key.pos.z);
+                    controls.target.set(key.target.x, key.target.y, key.target.z);
+                    controls.update();
+                    // syncControlsToCamera(); // Deprecated: controls state is now master
+                };
+                
+                // Drag to move time
+                kf.onmousedown = (e) => startDragCameraKeyframe(e, idx);
+
+                // Right click to delete
+                kf.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    if(confirm("删除这个镜头关键帧?")) {
+                        tempCameraTrack.splice(idx, 1);
+                        renderTrackTimeline();
+                    }
+                };
+                
+                cameraLane.appendChild(kf);
+            });
+
+            // 3. Object Tracks
+            // Reset containers first (remove all children except first 2 static ones)
+            while(trackHeaders.children.length > 2) trackHeaders.removeChild(trackHeaders.lastChild);
+            while(trackLanes.children.length > 1) trackLanes.removeChild(trackLanes.lastChild);
+
+            tempPlanData.forEach((item, idx) => {
+                // Header
+                const h = document.createElement('div');
+                h.className = 'track-header';
+                h.innerText = item.label;
+                h.onclick = () => selectObject(idx);
+                if(selectedObjectIndex === idx) h.style.color = 'var(--primary)';
+                trackHeaders.appendChild(h);
+
+                // Lane
+                const lane = document.createElement('div');
+                lane.className = 'track-lane';
+                if(selectedObjectIndex === idx) lane.style.background = 'rgba(59, 130, 246, 0.1)';
+                
+                // Keyframe (Start Time)
+                const kf = document.createElement('div');
+                kf.className = 'keyframe';
+                kf.style.left = ((item.time || 0) / currentPlanDuration * 100) + '%';
+                kf.title = `${item.label} appear @ ${item.time}s`;
+                kf.onmousedown = (e) => startDragKeyframe(e, idx); // Allow dragging keyframe
+                lane.appendChild(kf);
+                
+                trackLanes.appendChild(lane);
+            });
+            
+            // Update Visuals
+            updateCameraPathVisuals();
+        }
+        
+        function updateDuration(val) {
+            currentPlanDuration = parseInt(val);
+            if(currentPlanDuration < 5) currentPlanDuration = 5;
+            renderTrackTimeline();
+        }
+
+        function addCameraKeyframe() {
+            const t = currentEditorTime;
+            // Check if exists
+            const existing = tempCameraTrack.find(k => Math.abs(k.t - t) < 0.1);
+            
+            // Get current camera state safely
+            const currentPos = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+            // SimpleOrbitControls stores target in this.target, but camera.lookAt uses it.
+            // We should use controls.target which is the orbit center.
+            const currentTarget = { x: controls.target.x, y: controls.target.y, z: controls.target.z };
+
+            if(existing) {
+                existing.pos = currentPos;
+                existing.target = currentTarget;
+            } else {
+                tempCameraTrack.push({
+                    t: t,
+                    pos: currentPos,
+                    target: currentTarget
+                });
+                tempCameraTrack.sort((a,b) => a.t - b.t);
+            }
+            renderTrackTimeline();
+        }
+
+        function addObjectToTimeline(type) {
+            // Add object at center of screen (camera target)
+            const pos = { 
+                x: Math.round(controls.target.x + (Math.random()*10 - 5)), 
+                y: 2, 
+                z: Math.round(controls.target.z + (Math.random()*10 - 5)) 
+            };
+            
+            const label = type === 'camera' ? '新监控' : (type === 'guard' ? '新安保' : '新围栏');
+            
+            const newItem = {
+                type: type,
+                pos: pos,
+                label: label,
+                desc: "请配置详细信息",
+                time: Math.floor(currentEditorTime) // Add at current playhead time
+            };
+            
+            const index = tempPlanData.push(newItem) - 1;
+            
+            refreshEditorScene();
+            renderTrackTimeline();
+            selectObject(index);
+        }
+
+        // --- Scrubbing & Playback ---
+        function startScrub(e) {
+            if(isEditorPlaying) return;
+            const updateScrub = (evt) => {
+                const rect = document.getElementById('timeline-area').getBoundingClientRect();
+                let x = evt.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const t = (x / rect.width) * currentPlanDuration;
+                jumpToTime(t);
+            };
+            updateScrub(e); // Initial jump
+            
+            const onMove = (evt) => updateScrub(evt);
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+        
+        function startDragKeyframe(e, itemIndex) {
+            e.stopPropagation();
+            const onMove = (evt) => {
+                const rect = document.getElementById('timeline-area').getBoundingClientRect();
+                let x = evt.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const t = (x / rect.width) * currentPlanDuration;
+                
+                tempPlanData[itemIndex].time = Math.round(t * 10) / 10; // Round to 0.1s
+                renderTrackTimeline();
+                // refreshEditorScene(); // Removed to prevent heavy reload during drag
+                updateSceneAtTime(currentEditorTime); // Just update visibility
+            };
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+        
+        function startDragCameraKeyframe(e, keyIndex) {
+            e.stopPropagation();
+            const onMove = (evt) => {
+                const rect = document.getElementById('timeline-area').getBoundingClientRect();
+                let x = evt.clientX - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const t = (x / rect.width) * currentPlanDuration;
+                
+                tempCameraTrack[keyIndex].t = Math.round(t * 10) / 10;
+                tempCameraTrack.sort((a,b) => a.t - b.t); // Keep sorted
+                renderTrackTimeline();
+                updateSceneAtTime(currentEditorTime);
+            };
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+            };
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        }
+
+        function jumpToTime(t) {
+            currentEditorTime = Math.max(0, Math.min(t, currentPlanDuration));
+            updateTimeDisplay(currentEditorTime);
+            
+            // Move Playhead
+            const pct = (currentEditorTime / currentPlanDuration) * 100;
+            document.getElementById('playhead').style.left = pct + '%';
+            
+            // Update Scene State based on Time
+            updateSceneAtTime(currentEditorTime);
+        }
+        
+        function updateTimeDisplay(t) {
+            const s = Math.floor(t);
+            const ms = Math.floor((t - s) * 10);
+            document.getElementById('time-display').innerText = 
+                `00:${s.toString().padStart(2,'0')}.${ms}`;
+        }
+
+        function getCameraStateAtTime(t) {
+            if(tempCameraTrack.length === 0) return null;
+            
+            let prev = tempCameraTrack[0];
+            let next = tempCameraTrack[tempCameraTrack.length-1];
+            
+            for(let i=0; i<tempCameraTrack.length-1; i++) {
+                if(t >= tempCameraTrack[i].t && t < tempCameraTrack[i+1].t) {
+                    prev = tempCameraTrack[i];
+                    next = tempCameraTrack[i+1];
+                    break;
+                }
+            }
+            
+            const result = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+            
+            if(t >= next.t) {
+                result.pos.copy(next.pos);
+                result.target.copy(next.target);
+            } else if (t <= prev.t) {
+                result.pos.copy(prev.pos);
+                result.target.copy(prev.target);
+            } else {
+                const duration = next.t - prev.t;
+                const alpha = (t - prev.t) / duration;
+                
+                // Cubic easing
+                const ease = k => k<.5 ? 4*k*k*k : (k-1)*(2*k-2)*(2*k-2)+1;
+                const k = ease(alpha);
+                
+                result.pos.x = prev.pos.x + (next.pos.x - prev.pos.x) * k;
+                result.pos.y = prev.pos.y + (next.pos.y - prev.pos.y) * k;
+                result.pos.z = prev.pos.z + (next.pos.z - prev.pos.z) * k;
+                
+                result.target.x = prev.target.x + (next.target.x - prev.target.x) * k;
+                result.target.y = prev.target.y + (next.target.y - prev.target.y) * k;
+                result.target.z = prev.target.z + (next.target.z - prev.target.z) * k;
+            }
+            return result;
+        }
+
+        function updateCameraPathVisuals() {
+            if(!cameraHelpersGroup) return;
+            // Clear children manually for safety if clear() fails or behaves oddly
+            while(cameraHelpersGroup.children.length > 0){ 
+                cameraHelpersGroup.remove(cameraHelpersGroup.children[0]); 
+            }
+            
+            if(currentMode !== 'edit' || tempCameraTrack.length === 0) return;
+
+            // 1. Draw Keyframes (Frustums)
+            tempCameraTrack.forEach((kf, i) => {
+                const geometry = new THREE.ConeGeometry(2, 5, 4);
+                geometry.rotateX(Math.PI / 2); // Point Z-forward
+                const material = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.5 });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                mesh.position.set(kf.pos.x, kf.pos.y, kf.pos.z);
+                mesh.lookAt(kf.target.x, kf.target.y, kf.target.z);
+                
+                // Add index label
+                const sprite = makeTextSprite((i + 1).toString());
+                sprite.position.set(0, 3, 0);
+                mesh.add(sprite);
+
+                cameraHelpersGroup.add(mesh);
+            });
+
+            // 2. Draw Path (Sampled Line)
+            if(tempCameraTrack.length > 1) {
+                const points = [];
+                const steps = 100; // Resolution
+                for(let i=0; i<=steps; i++) {
+                    const t = (i / steps) * currentPlanDuration;
+                    const state = getCameraStateAtTime(t);
+                    if(state) points.push(state.pos);
+                }
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
+                const line = new THREE.Line(geometry, material);
+                cameraHelpersGroup.add(line);
+            }
+        }
+        
+        function makeTextSprite(message) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = "Bold 40px Arial";
+            context.fillStyle = "rgba(255,255,255,1)";
+            context.fillText(message, 0, 40);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMaterial);
+            sprite.scale.set(5, 2.5, 1);
+            return sprite;
+        }
+
+        function updateSceneAtTime(t) {
+            // 1. Interpolate Camera
+            const state = getCameraStateAtTime(t);
+            if(state) {
+                controls.camera.position.copy(state.pos);
+                controls.target.copy(state.target);
+                controls.camera.lookAt(controls.target);
+            }
+
+            // 2. Update Object Visibility
+            tempPlanData.forEach((item, idx) => {
+                // Find mesh
+                const mesh = objects.find(o => o.userData.index === idx);
+                if(mesh) {
+                    const visible = t >= (item.time || 0);
+                    
+                    if(currentMode === 'edit') {
+                        // In edit mode, show objects even if not yet active (ghost mode)
+                        mesh.visible = true;
+                        if(visible) {
+                            mesh.material.opacity = 1;
+                            mesh.material.transparent = false;
+                        } else {
+                            mesh.material.opacity = 0.3;
+                            mesh.material.transparent = true;
+                        }
+                    } else {
+                        // In play mode, strict visibility
+                        mesh.visible = visible;
+                        mesh.material.opacity = 1;
+                        mesh.material.transparent = false;
+                    }
+
+                    // Find label
+                    const label = labels.find(l => 
+                        Math.abs(l.position.x - item.pos.x) < 0.1 && 
+                        Math.abs(l.position.z - item.pos.z) < 0.1
+                    );
+                    if(label) {
+                        // Label logic: show if visible OR if in edit mode (ghost label?)
+                        // Let's keep label hidden in ghost mode to reduce clutter, show only when active
+                        label.element.style.display = visible ? 'block' : 'none';
+                        // But if selected, force show label
+                        if(currentMode === 'edit' && selectedObjectIndex === idx) {
+                            label.element.style.display = 'block';
+                            label.element.style.opacity = visible ? '1' : '0.5';
+                        }
+                    }
+                }
+            });
+        }
+
+        // Helper to sync controls internal state to current camera position
+        function syncControlsToCamera() {
+            const offset = new THREE.Vector3().subVectors(controls.camera.position, controls.target);
+            controls.radius = offset.length();
+            controls.theta = Math.atan2(offset.x, offset.z);
+            controls.phi = Math.acos(offset.y / controls.radius);
+            // Clamp phi
+            controls.phi = Math.max(0.1, Math.min(Math.PI/2 - 0.1, controls.phi));
+        }
+
+        function togglePlayEditor() {
+            if(isEditorPlaying) {
+                stopEditor();
+            } else {
+                isEditorPlaying = true;
+                document.getElementById('play-icon').className = 'fas fa-pause';
+                document.getElementById('play-text').innerText = '暂停';
+                editorStartTime = Date.now() - currentEditorTime * 1000;
+                requestAnimationFrame(editorLoop);
+            }
+        }
+        
+        function stopEditor() {
+            isEditorPlaying = false;
+            document.getElementById('play-icon').className = 'fas fa-play';
+            document.getElementById('play-text').innerText = '播放预览';
+        }
+        
+        function editorLoop() {
+            if(!isEditorPlaying) return;
+            
+            const now = Date.now();
+            let t = (now - editorStartTime) / 1000;
+            
+            if(t > currentPlanDuration) {
+                t = currentPlanDuration;
+                stopEditor();
+            }
+            
+            jumpToTime(t);
+            requestAnimationFrame(editorLoop);
+        }
+
+        function createPlan() {
+            const id = 'plan_' + Date.now();
+            plans[id] = { name: "新建安保方案", items: [], cameraTrack: [], duration: 30 };
+            renderPlanList(); // Refresh list to show new plan
+            editPlan(id);
+        }
+
+        // Keep savePlan but update it to save cameraTrack
+        function savePlan() {
+            try {
+                if(!editingPlanId || !plans[editingPlanId]) {
+                    alert("错误：无法找到当前编辑的方案ID！");
+                    return;
+                }
+
+                // 1. Force capture duration
+                const durationInput = document.getElementById('plan-duration');
+                if(durationInput) {
+                    let val = parseInt(durationInput.value);
+                    if(val < 5 || isNaN(val)) val = 30; // Default if invalid
+                    currentPlanDuration = val;
+                }
+
+                // 2. Save Data (Deep Copy)
+                plans[editingPlanId].items = JSON.parse(JSON.stringify(tempPlanData));
+                plans[editingPlanId].cameraTrack = JSON.parse(JSON.stringify(tempCameraTrack));
+                plans[editingPlanId].duration = currentPlanDuration;
+                
+                // 3. Verify Save
+                const savedPlan = plans[editingPlanId];
+                console.log("Plan Saved:", savedPlan);
+
+                if(savedPlan.cameraTrack.length === 0) {
+                    alert("警告：当前方案没有记录任何镜头关键帧！\n播放时镜头将不会移动。");
+                }
+
+                alert(`方案 [${savedPlan.name}] 保存成功！\n时长: ${savedPlan.duration}s\n安保点位: ${savedPlan.items.length}\n镜头关键帧: ${savedPlan.cameraTrack.length}`);
+                
+                // 4. Update UI
+                setMode('dashboard');
+                renderPlanList();
+                
+            } catch(e) {
+                console.error("Save failed:", e);
+                alert("保存失败：" + e.message);
+            }
+        }
+
+        // Override refreshEditorScene to handle visibility based on time
+        function refreshEditorScene() {
+            clearPlanObjects();
+            tempPlanData.forEach((item, idx) => {
+                const mesh = addMesh(item.pos, item.type);
+                mesh.userData = { isPlanObject: true, index: idx };
+                createLabel({x:item.pos.x, y:item.pos.y+5, z:item.pos.z}, item.label, item.desc, 'plan');
+            });
+            // Update visibility immediately
+            updateSceneAtTime(currentEditorTime);
+            // Re-highlight if still selected
+            if(selectedObjectIndex !== -1) selectObject(selectedObjectIndex);
+        }
+        
+        // Override Play Demo to use the new system
+        // Deprecated - we unified logic into the playDemo above.
+        // But need to ensure the bottom panel button calls the right function.
+        // The above function was defined in `playDemo` block.
+        // Let's remove the duplicate definition at the bottom of file to avoid conflicts.
+        // Actually, the previous tool call replaced the FIRST occurrence of playDemo (around line 1023).
+        // There is ANOTHER definition of playDemo at the bottom (around line 1564).
+        // We must remove the second definition.
+
+        // --- Drag Controls Update ---
+        // Ensure drag controls update position in tempPlanData AND timeline
+        // (Existing setupDragControls logic updates tempPlanData, which is fine)
+        // (Existing onMouseUp calls refreshEditorScene, which is also fine)
+
+        function addToPlan(type) { /* Deprecated/Replaced by addObjectToTimeline */ }
+        function renderTimeline() { /* Deprecated/Replaced by renderTrackTimeline */ }
+
+        // --- End of New Functions ---
+
+        /* 
+           Existing functions below need to be preserved or carefully replaced 
+           (Note: I've redefined editPlan, createPlan, savePlan above)
+        */
+
+        function removeFromPlan(index) {
+            if(selectedObjectIndex === index) deselectObject();
+            
+            tempPlanData.splice(index, 1);
+            
+            // Refresh Scene (simplest way to re-index)
+            refreshEditorScene();
+            renderTimeline();
+        }
+        
+        function refreshEditorScene() {
+            clearPlanObjects();
+            tempPlanData.forEach((item, idx) => {
+                const mesh = addMesh(item.pos, item.type);
+                mesh.userData = { isPlanObject: true, index: idx };
+                createLabel({x:item.pos.x, y:item.pos.y+5, z:item.pos.z}, item.label, item.desc, 'plan');
+            });
+            // Re-highlight if still selected (index might have shifted, but let's just deselect for safety)
+            deselectObject();
+        }
+
+        // --- Selection & Transform ---
+        function onSceneClick(event) {
+            if(currentMode !== 'edit') return;
+            
+            // Calculate mouse position in normalized device coordinates
+            const mouse = new THREE.Vector2();
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = - (event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            // Intersect with plan objects
+            const intersects = raycaster.intersectObjects(objects);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if(object.userData && object.userData.isPlanObject) {
+                    selectObject(object.userData.index);
+                    event.stopPropagation(); // Stop propagation if object clicked
+                }
+            } else {
+                // Deselect if clicked empty space
+                // deselectObject(); // Optional: clicking void deselects
+            }
+        }
+
+        function selectObject(index) {
+            selectedObjectIndex = index;
+            const item = tempPlanData[index];
+            
+            // Highlight Object (Visual feedback - find mesh)
+            objects.forEach(obj => {
+                if(obj.userData.index === index) {
+                    obj.material.emissive.setHex(0x555555);
+                } else {
+                    if(obj.material.emissive) obj.material.emissive.setHex(0x000000);
+                }
+            });
+
+            // Highlight Timeline
+            document.querySelectorAll('.timeline-item').forEach((el, i) => {
+                if(i === index) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            // Show Transform Controls
+            const ctrl = document.getElementById('transform-controls');
+            ctrl.style.display = 'flex';
+            
+            document.getElementById('pos-x').value = item.pos.x;
+            document.getElementById('pos-y').value = item.pos.y;
+            document.getElementById('pos-z').value = item.pos.z;
+            document.getElementById('obj-label').value = item.label;
+        }
+
+        function deselectObject() {
+            selectedObjectIndex = -1;
+            
+            // Remove Highlights
+            objects.forEach(obj => {
+                if(obj.material.emissive) obj.material.emissive.setHex(0x000000);
+            });
+            document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
+            
+            // Hide Controls
+            document.getElementById('transform-controls').style.display = 'none';
+        }
+
+        function updateObjectPos() {
+            if(selectedObjectIndex === -1) return;
+            
+            const x = parseFloat(document.getElementById('pos-x').value);
+            const y = parseFloat(document.getElementById('pos-y').value);
+            const z = parseFloat(document.getElementById('pos-z').value);
+            
+            const item = tempPlanData[selectedObjectIndex];
+            item.pos = { x, y, z };
+            
+            // Update Mesh Position
+            const mesh = objects.find(o => o.userData.index === selectedObjectIndex);
+            if(mesh) mesh.position.set(x, y, z);
+            
+            // Update Label Position (Brute force refresh for simplicity)
+            refreshEditorScene(); 
+            selectObject(selectedObjectIndex); // Re-select to keep UI
+        }
+        
+        function updateObjectLabel() {
+            if(selectedObjectIndex === -1) return;
+            const val = document.getElementById('obj-label').value;
+            tempPlanData[selectedObjectIndex].label = val;
+            
+            refreshEditorScene();
+            selectObject(selectedObjectIndex);
+            renderTimeline();
+        }
+
+        // --- Drag Controls Implementation ---
+        function setupDragControls() {
+            let isDraggingObj = false;
+            let dragObject = null;
+            
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                if(currentMode !== 'edit') return;
+                
+                mouse.x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
+                mouse.y = - (e.clientY / renderer.domElement.clientHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(objects);
+                
+                if(intersects.length > 0 && intersects[0].object.userData.isPlanObject) {
+                    isDraggingObj = true;
+                    dragObject = intersects[0].object;
+                    controls.enabled = false; // Disable orbit
+                    selectObject(dragObject.userData.index);
+                }
+            });
+            
+            window.addEventListener('mousemove', (e) => {
+                if(!isDraggingObj || !dragObject) return;
+                
+                mouse.x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
+                mouse.y = - (e.clientY / renderer.domElement.clientHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObject(dragPlane);
+                
+                if(intersects.length > 0) {
+                    const point = intersects[0].point;
+                    dragObject.position.set(Math.round(point.x), dragObject.position.y, Math.round(point.z));
+                    
+                    // Update Input Values
+                    document.getElementById('pos-x').value = dragObject.position.x;
+                    document.getElementById('pos-z').value = dragObject.position.z;
+                    
+                    // Update Data
+                    const item = tempPlanData[dragObject.userData.index];
+                    item.pos.x = dragObject.position.x;
+                    item.pos.z = dragObject.position.z;
+                }
+            });
+            
+            window.addEventListener('mouseup', () => {
+                if(isDraggingObj) {
+                    isDraggingObj = false;
+                    dragObject = null;
+                    controls.enabled = true; // Re-enable orbit
+                    refreshEditorScene(); // Sync labels
+                    selectObject(selectedObjectIndex); // Restore selection state
+                }
+            });
+        }
+
+
+        // Deprecated old savePlan removed
+        // Deprecated old exitEditor removed
+        
+        function exitEditor() {
+            if(confirm("确定退出编辑吗？未保存的更改将丢失。")) {
+                setMode('dashboard');
+                clearPlanObjects(); 
+                editingPlanId = null; // Clear ID
+            }
+        }
+
+
+        function renderTimeline() {
+            const container = document.getElementById('editor-timeline');
+            container.innerHTML = '';
+            
+            tempPlanData.forEach((item, index) => {
+                // Connector
+                if(index > 0) {
+                    const conn = document.createElement('div');
+                    conn.className = 'timeline-connector';
+                    container.appendChild(conn);
+                }
+                
+                // Item
+                const div = document.createElement('div');
+                div.className = 'timeline-item';
+                
+                let icon = 'fa-cube';
+                if(item.type === 'camera') icon = 'fa-video';
+                if(item.type === 'guard') icon = 'fa-user-shield';
+                if(item.type === 'barrier') icon = 'fa-bars';
+                
+                div.innerHTML = `
+                    <i class="fas ${icon}" style="font-size:20px; margin-bottom:5px;"></i>
+                    <span>${item.label}</span>
+                    <i class="fas fa-times-circle" style="position:absolute; top:2px; right:2px; color:rgba(255,255,255,0.5); cursor:pointer;" onclick="event.stopPropagation(); removeFromPlan(${index})"></i>
+                `;
+                
+                div.onclick = () => {
+                    // Select object and focus
+                    selectObject(index);
+                    // focusCamera(item.pos); // Don't move camera
+                    // Jump time to object start time so it becomes fully visible
+                    if(currentEditorTime < item.time) {
+                        jumpToTime(item.time);
+                    }
+                };
+                
+                container.appendChild(div);
+            });
+        }
+
+        function toggleLayer(layer, btn) {
+            btn.classList.toggle('active');
+            const isActive = btn.classList.contains('active');
+            
+            if(layer === 'location') {
+                labels.forEach(l => {
+                    if(l.type === 'location') l.element.style.visibility = isActive ? 'visible' : 'hidden';
+                });
+            } else if(layer === 'plan') {
+                labels.forEach(l => {
+                    if(l.type === 'plan') l.element.style.visibility = isActive ? 'visible' : 'hidden';
+                });
+                objects.forEach(o => o.visible = isActive);
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            const panels = document.querySelectorAll('.panel');
+            const centerControls = document.getElementById('center-controls');
+            const rotateUI = document.getElementById('rotate-ui');
+            const editorUI = document.getElementById('editor-ui');
+            
+            // Toggle Camera Path Visuals
+            if(cameraHelpersGroup) cameraHelpersGroup.visible = (mode === 'edit');
+
+            // Dashboard Mode
+            if(mode === 'dashboard') {
+                panels.forEach(p => { p.style.opacity = '1'; p.style.pointerEvents = 'auto'; });
+                if(centerControls) centerControls.style.display = 'flex';
+                if(rotateUI) rotateUI.style.display = 'flex';
+                if(editorUI) editorUI.style.display = 'none';
+            } 
+            // Roam Mode
+            else if(mode === 'roam') {
+                panels.forEach(p => { p.style.opacity = '0'; p.style.pointerEvents = 'none'; });
+                if(centerControls) centerControls.style.display = 'flex';
+                if(rotateUI) rotateUI.style.display = 'none'; // Hide rotate in roam
+                if(editorUI) editorUI.style.display = 'none';
+            }
+            // Edit Mode
+            else if(mode === 'edit') {
+                panels.forEach(p => { p.style.opacity = '0'; p.style.pointerEvents = 'none'; });
+                if(centerControls) centerControls.style.display = 'none'; // Hide entire container
+                if(editorUI) editorUI.style.display = 'flex';
+            }
+        }
+        
+        function toggleAutoRotate() {
+            controls.autoRotate = document.getElementById('auto-rotate-check').checked;
+        }
+        
+        function setRotateSpeed(val) {
+            controls.rotateSpeed = val * 0.001;
+        }
+
+        function initCharts() {
+            const chart = echarts.init(document.getElementById('chart-traffic'));
+            chart.setOption({
+                grid: { top: 10, bottom: 20, left: 30, right: 10 },
+                xAxis: { type: 'category', data: ['A区','B区','C区','D区'], axisLabel: {color:'#ccc'} },
+                yAxis: { type: 'value', axisLabel: {color:'#ccc'}, splitLine: {lineStyle:{color:'#333'}} },
+                series: [{
+                    data: [120, 200, 150, 80],
+                    type: 'bar',
+                    itemStyle: { color: '#3b82f6' }
+                }]
+            });
+            window.addEventListener('resize', () => chart.resize());
+        }
+
+        function updateClock() {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+            setTimeout(updateClock, 1000);
+        }
+
+        init3D();
+
+    </script>
+</body>
+</html>

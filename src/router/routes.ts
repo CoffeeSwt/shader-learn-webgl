@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from "vue-router";
 
 export const routes: Array<RouteRecordRaw> = [
-  { path: "/", redirect: "/home" },
+  { path: "/", redirect: "/anbao" },
 
   { path: "/home", name: "Home", component: () => import("@/views/Home.vue") },
   // { path: "/demo", name: "Demo", component: () => import("@/views/Demo.vue") },
@@ -56,14 +56,20 @@ export const routes: Array<RouteRecordRaw> = [
     name: "FractalExamples",
     component: () => import("@/views/Trae/Trae.vue"),
   },
+  // 3D Tiles相关路由
+  {
+    path: "/3d-tiles",
+    name: "3DTiles",
+    component: () => import("@/views/3Dtiles/Demo.vue"),
+  },
   {
     path: "/digital-human",
     name: "DigitalHuman",
     component: () => import("@/views/DigtalHuman/DigtalHuman.vue"),
   },
   {
-    path: "/3d-tiles",
-    name: "3DTiles",
-    component: () => import("@/views/3Dtiles/Demo.vue"),
-  },
+    path: "/anbao",
+    name: "Anbao",
+    component: () => import("@/views/Anbao/index.vue"),
+  }
 ];
