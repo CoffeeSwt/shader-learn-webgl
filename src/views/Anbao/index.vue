@@ -20,6 +20,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import AnbaoScene from './components/AnbaoScene.vue';
 import AnbaoHeader from './components/AnbaoHeader.vue';
 import AnbaoDashboard from './components/AnbaoDashboard.vue';
@@ -30,7 +31,8 @@ import ResetViewButton from './components/ResetViewButton.vue';
 import PlayControlOverlay from './components/PlayControlOverlay.vue';
 import { useAnbaoState } from './composables/useAnbaoState';
 
-const { currentMode } = useAnbaoState();
+const { currentMode, loadVenueInfo } = useAnbaoState();
+const route = useRoute();
 
 // --- External Script Loading ---
 const loadScript = (src: string) => {
@@ -64,6 +66,10 @@ onMounted(async () => {
         await loadScript("https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js");
         await loadScript("https://cdn.staticfile.org/tween.js/18.6.4/tween.umd.js");
         // Dependencies loaded, child components will initialize themselves via onMounted checks or retry logic
+        
+        if (route.params.id) {
+            loadVenueInfo(route.params.id as string);
+        }
     } catch (e) {
         console.error("Failed to load dependencies", e);
     }

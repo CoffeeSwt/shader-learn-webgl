@@ -69,7 +69,16 @@ export const routes: Array<RouteRecordRaw> = [
   },
   {
     path: "/anbao",
-    name: "Anbao",
-    component: () => import("@/views/Anbao/index.vue"),
+    redirect: "/anbao/map"
+  },
+  {
+    path: "/anbao/map",
+    name: "AnbaoMap",
+    component: () => import("@/views/Anbao/Map/MapSelector.vue")
+  },
+  {
+    path: "/anbao/venue/:id",
+    name: "AnbaoVenue",
+    component: () => import("@/views/Anbao/index.vue")
   }
 ];

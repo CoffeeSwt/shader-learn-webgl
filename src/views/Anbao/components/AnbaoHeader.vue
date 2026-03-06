@@ -1,15 +1,29 @@
 <template>
     <div class="header pointer-events-auto">
-        <div class="logo"><i class="fas fa-shield-alt"></i> 智慧安保指挥平台</div>
+        <div class="logo">
+            <i class="fas fa-arrow-left back-icon" title="返回地图" @click="goBack" v-if="canGoBack"></i>
+            <i class="fas fa-shield-alt"></i> 智慧安保指挥平台
+        </div>
         <div class="clock" id="clock">{{ currentTime }}</div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { useAnbaoState } from '../composables/useAnbaoState';
+import { useRouter, useRoute } from 'vue-router';
+import { computed } from 'vue';
 
 const { currentTime, updateClock } = useAnbaoState();
 updateClock();
+
+const router = useRouter();
+const route = useRoute();
+
+const canGoBack = computed(() => route.name === 'AnbaoVenue');
+
+const goBack = () => {
+    router.push('/anbao/map');
+};
 </script>
 
 <style scoped>
@@ -28,6 +42,21 @@ updateClock();
     font-weight: bold;
     color: #3b82f6;
     text-shadow: 0 0 10px #3b82f6;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.back-icon {
+    font-size: 20px;
+    color: #f59e0b;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.back-icon:hover {
+    transform: scale(1.1);
+    color: #fff;
 }
 
 .clock {
