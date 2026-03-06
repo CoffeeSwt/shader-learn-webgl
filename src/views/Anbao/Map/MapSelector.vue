@@ -101,7 +101,7 @@ const loadMap = async (adcode: number, mapName: string) => {
     loading.value = true;
     try {
         const url = `https://geo.datav.aliyun.com/areas_v3/bound/${adcode}_full.json`;
-        const response = await fetch(url);
+        const response = await fetch(url, { referrerPolicy: 'no-referrer' });
         if (!response.ok) throw new Error('Network response was not ok');
         const geoJson = await response.json();
 

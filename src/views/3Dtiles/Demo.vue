@@ -3,6 +3,7 @@
 </template>
 
 <script setup lang="ts">
+//@ts-ignore
 import { TilesRenderer } from '3d-tiles-renderer';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
