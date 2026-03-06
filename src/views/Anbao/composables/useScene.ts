@@ -114,19 +114,22 @@ export function useScene() {
             <div class="detail">${desc}</div>
         `;
 
+        // Create vector instance for this label
+        const labelPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+
         div.onclick = (e) => {
             e.stopPropagation();
             // userDataIndex logic
             document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
             div.classList.add('expanded');
-            focusCamera(pos);
+            focusCamera(labelPos); // Use the vector reference that gets updated
         };
 
         labelsContainerEl.appendChild(div);
 
         labels.value.push({
             element: div,
-            position: new THREE.Vector3(pos.x, pos.y, pos.z),
+            position: labelPos,
             type: type,
             userDataIndex: userDataIndex
         });
@@ -216,6 +219,38 @@ export function useScene() {
             if (label.type === 'plan' && !layers.plan) {
                 label.element.style.display = 'none';
                 return;
+            }
+
+            // Sync position if linked to object
+            if (label.userDataIndex !== undefined && label.userDataIndex !== -1) {
+                const mesh = objects.value.find(o => o.userData.index === label.userDataIndex);
+                if (mesh) {
+                     // Check if visible (respecting updateSceneAtTime or other visibility logic)
+                     if (!mesh.visible) {
+                         label.element.style.display = 'none';
+                         return;
+                     }
+
+                     if (mesh.userData.isGroup) {
+                         // Calculate center for line object from PlanItem data
+                         const item = tempPlanData[label.userDataIndex];
+                         if (item && item.endPos) {
+                             const start = new THREE.Vector3(item.pos.x, item.pos.y, item.pos.z);
+                             const end = new THREE.Vector3(item.endPos.x, item.endPos.y, item.endPos.z);
+                             const center = start.clone().lerp(end, 0.5);
+                             label.position.copy(center);
+                         } else {
+                             label.position.copy(mesh.position);
+                         }
+                     } else {
+                         label.position.copy(mesh.position);
+                     }
+                     label.position.y += 5; // Offset
+                } else {
+                    // Object removed?
+                    label.element.style.display = 'none';
+                    return;
+                }
             }
 
             const vector = label.position.clone();
@@ -493,36 +528,14 @@ export function useScene() {
 
                 const label = labels.value.find(l => l.userDataIndex === idx);
                 if (label) {
-                    label.element.style.display = visible ? 'block' : 'none';
+                    // Visibility logic (style.display) is now handled in updateLabels primarily
+                    // But we can set opacity for edit mode here
                     if (currentMode === 'edit' && selectedObjectIndex === idx) {
-                        label.element.style.display = 'block';
                         label.element.style.opacity = visible ? '1' : '0.5';
+                    } else {
+                        label.element.style.opacity = '1';
                     }
-                    // Update label position if object moved
-                    label.position.copy(mesh.position);
-                    
-                    // For line objects, position is start, but label should be at center?
-                    // rebuildSceneFromPlan sets label at center initially.
-                    // If mesh (group) moves, it moves from start pos.
-                    // So we need to offset label by center delta?
-                    // Actually, if we move the group, the center moves relative to group.
-                    // But group.position is start.
-                    // Let's re-calculate center if it's a line object?
-                    // For simplicity, if we move the group, we just stick label to group position + offset.
-                    // But group position is start.
-                    // Better: Store local offset in label? Or just re-calc.
-                    
-                    if (item.endPos) {
-                        const start = new THREE.Vector3(item.pos.x, item.pos.y, item.pos.z);
-                        const end = new THREE.Vector3(item.endPos.x, item.endPos.y, item.endPos.z);
-                        const center = start.clone().add(end.clone().sub(start).multiplyScalar(0.5));
-                        // The mesh.position matches item.pos (start)
-                        // So label should be at mesh.position + (center - start)
-                        const offset = center.sub(start);
-                        label.position.copy(mesh.position).add(offset);
-                    }
-                    
-                    label.position.y += 5; // offset
+                    // Position sync removed from here, handled in updateLabels
                 }
             }
         });
