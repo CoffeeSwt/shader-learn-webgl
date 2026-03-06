@@ -35,6 +35,9 @@
         <div class="divider"></div>
 
         <div class="tool-group">
+            <button class="tool-btn" @click="resetView" title="重置视角">
+                <i class="fas fa-undo"></i>
+            </button>
             <button class="tool-btn" @click="addCameraKeyframe" title="记录当前镜头视角">
                 <i class="fas fa-camera"></i>
             </button>
@@ -56,9 +59,11 @@
 <script setup lang="ts">
 import { useEditorActions } from '../../composables/useEditorActions';
 import { useInteraction } from '../../composables/useInteraction';
+import { useScene } from '../../composables/useScene';
 
 const { addCameraKeyframe, addObjectToTimeline, savePlan, exitEditor } = useEditorActions();
 const { startDrawingLine } = useInteraction();
+const { resetView } = useScene();
 
 const startDrawLine = (type: string) => {
     startDrawingLine(type);

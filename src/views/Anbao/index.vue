@@ -8,7 +8,7 @@
 
         <div id="ui-layer" :class="{ 'pointer-events-none': currentMode === 'roam' || currentMode === 'edit' }">
             <AnbaoEditor />
-            <ResetViewButton />
+            <!-- ResetViewButton is handled inside AnbaoControls for dashboard mode, or toolbar for edit mode -->
             <AnbaoHeader />
             <AnbaoDashboard v-show="currentMode === 'dashboard'" />
             <AnbaoControls />
@@ -27,12 +27,12 @@ import AnbaoDashboard from './components/AnbaoDashboard.vue';
 import AnbaoEditor from './components/AnbaoEditor.vue';
 import AnbaoControls from './components/AnbaoControls.vue';
 import AppliedPlanBadge from './components/AppliedPlanBadge.vue';
-import ResetViewButton from './components/ResetViewButton.vue';
 import PlayControlOverlay from './components/PlayControlOverlay.vue';
 import { useAnbaoState } from './composables/useAnbaoState';
 
 const { currentMode, loadVenueInfo } = useAnbaoState();
 const route = useRoute();
+
 
 // --- External Script Loading ---
 const loadScript = (src: string) => {

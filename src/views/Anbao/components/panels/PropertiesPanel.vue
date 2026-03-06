@@ -47,17 +47,16 @@
                  <button class="action-btn" @click="deselectObject">取消选择</button>
             </div>
         </div>
-        <div v-else class="empty-state">
-            <i class="fas fa-cube"></i>
-            <p>未选择对象</p>
-            <small>在场景中点击或从列表选择</small>
-        </div>
+        
+        <!-- Show Animation Sequences when no object is selected -->
+        <AnimationSequencesPanel v-else />
     </div>
 </template>
 
 <script setup lang="ts">
 import { useAnbaoState } from '../../composables/useAnbaoState';
 import { useInteraction } from '../../composables/useInteraction';
+import AnimationSequencesPanel from './AnimationSequencesPanel.vue';
 
 const { selectedObjectIndex } = useAnbaoState();
 const { 

@@ -7,6 +7,10 @@
             </button>
             <button class="editor-btn" @click="stopEditor"><i class="fas fa-stop"></i> 停止</button>
             <div class="time-display" id="time-display">{{ formattedEditorTime }}</div>
+            
+            <div class="sequence-badge" v-if="tempSequences.length > 0">
+                <i class="fas fa-film"></i> {{ currentSequenceName }}
+            </div>
 
             <div style="flex:1;"></div>
 
@@ -62,20 +66,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
+import { ref, onUnmounted, computed } from 'vue';
 import { usePlans } from '../../composables/usePlans';
 import { useEditorState } from '../../composables/useEditorState';
 import { useAnbaoState } from '../../composables/useAnbaoState';
 import { useScene } from '../../composables/useScene';
 import { useInteraction } from '../../composables/useInteraction';
 
-const { tempPlanData, tempCameraTrack, currentPlanDuration } = usePlans();
+const { tempPlanData, tempCameraTrack, currentPlanDuration, tempSequences, currentSequenceIndex } = usePlans();
 const { currentEditorTime, isEditorPlaying, editorStartTime, formattedEditorTime } = useEditorState();
 const { selectedObjectIndex } = useAnbaoState();
 const { updateSceneAtTime, updateCameraPathVisuals, controls } = useScene();
 const { selectObject } = useInteraction();
 
 const timelineAreaRef = ref<HTMLElement | null>(null);
+
+const currentSequenceName = computed(() => {
+    if (tempSequences.length > 0 && currentSequenceIndex.value >= 0) {
+        return tempSequences[currentSequenceIndex.value].name;
+    }
+    return '默认序列';
+});
 
 const jumpToTime = (t: number) => {
     currentEditorTime.value = Math.max(0, Math.min(t, currentPlanDuration.value));
@@ -224,6 +235,16 @@ const startDragCameraKeyframe = (e: MouseEvent, keyIndex: number) => {
     background: rgba(0, 0, 0, 0.3);
 }
 
+.sequence-badge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    margin-left: 10px;
+}
+
 .time-display {
     font-family: monospace;
     color: #3b82f6;
@@ -346,3 +367,5 @@ const startDragCameraKeyframe = (e: MouseEvent, keyIndex: number) => {
     background: #3b82f6;
 }
 </style>
+
+

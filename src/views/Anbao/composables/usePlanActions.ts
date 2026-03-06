@@ -43,6 +43,15 @@ export function usePlanActions() {
             currentMode.value = 'edit';
             refreshEditorScene();
             
+            // Stop auto-rotate when entering edit mode
+            if (controls.value) {
+                controls.value.autoRotate = false;
+            }
+            // Also update the reactive state if exposed
+            // But useScene doesn't expose a setter for autoRotate ref directly, but exposes the ref itself.
+            // Let's check useScene exports.
+            // It exports autoRotate ref.
+            
             if (tempCameraTrack.length > 0 && controls.value) {
                 const firstKey = tempCameraTrack[0];
                 controls.value.camera.position.copy(firstKey.pos as any);
@@ -68,7 +77,68 @@ export function usePlanActions() {
         }
     };
 
-    const runDemoFrame = () => {
+    const playDemo = (planId: string) => {
+        const plan = plans[planId];
+        if (!plan) return;
+
+        let sequenceToPlay: any = null;
+
+        // 1. Check sequences
+        if (plan.sequences && plan.sequences.length > 0) {
+            sequenceToPlay = plan.sequences[0];
+        } 
+        // 2. Fallback to legacy
+        else if (plan.cameraTrack && plan.cameraTrack.length > 0) {
+             sequenceToPlay = {
+                 track: plan.cameraTrack,
+                 duration: plan.duration || 30
+             };
+        }
+
+        if (!sequenceToPlay || !sequenceToPlay.track || sequenceToPlay.track.length === 0) {
+             alert("该方案没有包含任何动画序列！\n请先进入编辑模式创建镜头动画。");
+             return;
+        }
+
+        // Setup Playback State
+        tempPlanData.splice(0, tempPlanData.length, ...JSON.parse(JSON.stringify(plan.items || [])));
+        // We use tempCameraTrack for playback visualization
+        tempCameraTrack.splice(0, tempCameraTrack.length, ...JSON.parse(JSON.stringify(sequenceToPlay.track)));
+        demoDuration.value = sequenceToPlay.duration || 30;
+        
+        // Clear scene and rebuild static items
+        clearPlanObjects();
+        tempPlanData.forEach((item, idx) => {
+            // Re-use rebuild logic or manual add
+            // Manual add for now to ensure labels
+             const mesh = addMesh(item.pos, item.type);
+             if (mesh) {
+                 // Check for line object logic (simplified here or reuse rebuildSceneFromPlan)
+                 // Let's use rebuildSceneFromPlan logic if possible, but it depends on 'edit' mode usually.
+                 // Actually rebuildSceneFromPlan is not exported from useScene, but we have access to it?
+                 // No, useScene exports it.
+                 // But here we are inside usePlanActions which imports useScene.
+                 
+                 // However, rebuildSceneFromPlan clears objects first.
+                 // Let's use rebuildSceneFromPlan to handle complex objects like fences correctly.
+             }
+        });
+        
+        // Better approach: Use rebuildSceneFromPlan
+        rebuildSceneFromPlan(tempPlanData, 'roam', 0);
+
+        // Start Animation Loop
+        isAnimating.value = true;
+        currentMode.value = 'roam';
+        showResetBtn.value = false;
+        isDemoPaused.value = false;
+        demoElapsedTime.value = 0;
+        lastFrameTime = Date.now();
+        
+        requestAnimationFrame(runDemoLoop);
+    };
+
+    const runDemoLoop = () => {
         if (!isAnimating.value) return;
 
         const now = Date.now();
@@ -80,54 +150,17 @@ export function usePlanActions() {
 
             if (demoElapsedTime.value >= demoDuration.value) {
                 demoElapsedTime.value = demoDuration.value;
-                stopDemo();
+                isAnimating.value = false; // Stop loop
                 alert("演示结束");
+                currentMode.value = 'dashboard'; // Exit roam
+                showResetBtn.value = true;
                 return;
             }
 
             updateSceneAtTime(demoElapsedTime.value, 'roam');
         }
 
-        requestAnimationFrame(runDemoFrame);
-    };
-
-    const playDemo = (planId: string) => {
-        const plan = plans[planId];
-        if (!plan) return;
-
-        demoDuration.value = (plan.duration && !isNaN(plan.duration) && plan.duration > 0) ? plan.duration : 30;
-
-        // Load data to temp (reusing temp data structures for playback visualization if convenient, 
-        // or we should have separate playback logic. index.vue used tempPlanData)
-        tempPlanData.splice(0, tempPlanData.length, ...JSON.parse(JSON.stringify(plan.items || [])));
-        tempCameraTrack.splice(0, tempCameraTrack.length, ...JSON.parse(JSON.stringify(plan.cameraTrack || [])));
-
-        if (tempCameraTrack.length === 0 && camera.value && controls.value) {
-            tempCameraTrack.push({
-                t: 0,
-                pos: { x: camera.value.position.x, y: camera.value.position.y, z: camera.value.position.z },
-                target: { x: controls.value.target.x, y: controls.value.target.y, z: controls.value.target.z }
-            });
-        }
-
-        clearPlanObjects();
-        tempPlanData.forEach((item, idx) => {
-            const mesh = addMesh(item.pos, item.type);
-            if (mesh) {
-                mesh.userData = { isPlanObject: true, index: idx };
-                createLabel({ x: item.pos.x, y: item.pos.y + 5, z: item.pos.z }, item.label, item.desc, 'plan');
-            }
-        });
-
-        isAnimating.value = true;
-        currentMode.value = 'roam';
-        showResetBtn.value = false;
-
-        isDemoPaused.value = false;
-        demoElapsedTime.value = 0;
-        lastFrameTime = Date.now();
-
-        requestAnimationFrame(runDemoFrame);
+        requestAnimationFrame(runDemoLoop);
     };
 
     const toggleDemoPause = () => {

@@ -27,6 +27,8 @@ const rotateSpeed = ref(0.5);
 // Internal variables
 let labelsContainerEl: HTMLElement | null = null;
 let animationId: number;
+let onFocusCallback: (() => void) | null = null;
+let onResetCallback: (() => void) | null = null;
 
 export function useScene() {
     const { tempPlanData, tempCameraTrack, currentPlanDuration } = usePlans();
@@ -274,6 +276,11 @@ export function useScene() {
         // @ts-ignore
         if (window.TWEEN) window.TWEEN.update();
 
+        // Check if we are in dashboard mode or if explicit auto-rotate is enabled
+        // currentMode is not available here directly, but we can infer or pass it.
+        // Or simply respect the autoRotate ref which is toggled by other components.
+        // Actually controls.value.autoRotate is the flag for the controls instance.
+        
         if (controls.value && !controls.value.isDragging && !isAnimating.value && controls.value.autoRotate && autoRotate.value) {
             controls.value.theta += controls.value.rotateSpeed;
             controls.value.update();
@@ -299,7 +306,8 @@ export function useScene() {
         if (!controls.value) return;
         controls.value.autoRotate = false;
         autoRotate.value = false;
-        // Logic to show reset btn can be handled by UI observing autoRotate or similar
+        
+        if (onFocusCallback) onFocusCallback();
 
         const startTarget = { x: controls.value.target.x, y: controls.value.target.y, z: controls.value.target.z };
 
@@ -330,6 +338,8 @@ export function useScene() {
     const resetView = () => {
         if (!controls.value) return;
         document.querySelectorAll('.label-marker').forEach(el => el.classList.remove('expanded'));
+        
+        if (onResetCallback) onResetCallback();
 
         const targetPos = { x: 0, y: 0, z: 0 };
         const duration = 1500;
@@ -627,11 +637,17 @@ export function useScene() {
         updateSceneAtTime(time, mode);
     };
 
+    const setCallbacks = (focusCb: () => void, resetCb: () => void) => {
+        onFocusCallback = focusCb;
+        onResetCallback = resetCb;
+    };
+
     return {
         scene, camera, renderer, controls, objects, labels, dragPlane, cameraHelpersGroup,
         isAnimating, autoRotate, rotateSpeed, layers,
         init3D, animate, addMesh, createLabel, clearPlanObjects, 
         focusCamera, resetView, updateCameraPathVisuals, updateSceneAtTime, rebuildSceneFromPlan,
-        getCameraStateAtTime // exported for Editor to use
+        getCameraStateAtTime, // exported for Editor to use
+        setCallbacks
     };
 }
