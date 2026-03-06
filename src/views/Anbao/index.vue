@@ -1430,6 +1430,10 @@ const onGlobalMouseUp = () => { }; // Placeholder if needed
     font-family: 'Inter', sans-serif;
 }
 
+.anbao-container * {
+    box-sizing: border-box;
+}
+
 #canvas-container {
     position: absolute;
     top: 0;
@@ -1490,7 +1494,7 @@ const onGlobalMouseUp = () => { }; // Placeholder if needed
     grid-template-columns: 350px 1fr 350px;
     grid-template-rows: 1fr 1fr;
     gap: 20px;
-    height: calc(100% - 60px);
+    min-height: 0;
 }
 
 .panel {
