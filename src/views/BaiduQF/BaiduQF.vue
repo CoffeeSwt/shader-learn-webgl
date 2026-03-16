@@ -23,9 +23,12 @@ let camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 1000)
 let renderer = new THREE.WebGLRenderer({ antialias: true })
 const tweenGroup = new Group()
 
+// View control state
+const viewCenter = new THREE.Vector3(0, 0, 1000) // Initial overview position
+const mouseOffset = new THREE.Vector3()
+
 // Mouse interaction state
 const mousePos = new THREE.Vector2()
-const targetCameraPos = new THREE.Vector3(0, 0, 1000) // Start at initial Z
 const windowHalfX = window.innerWidth / 2
 const windowHalfY = window.innerHeight / 2
 
@@ -33,13 +36,14 @@ const onDocumentMouseMove = (event: MouseEvent) => {
     mousePos.x = (event.clientX - windowHalfX)
     mousePos.y = (event.clientY - windowHalfY)
     
-    // Map mouse position to world coordinates
-    // Mouse X range: [-windowHalfX, windowHalfX] -> World X range: [-200, 200] (approx total width 400)
-    // Mouse Y range: [-windowHalfY, windowHalfY] -> World Y range: [-112.5, 112.5] (approx total height 225)
-    // We add some multiplier to allow reaching edges comfortably or overshooting slightly
-    const sensitivity = 1.2
-    targetCameraPos.x = (mousePos.x / windowHalfX) * 200 * sensitivity
-    targetCameraPos.y = -(mousePos.y / windowHalfY) * 112.5 * sensitivity
+    // Map mouse position to world offset
+    // Limit movement to a smaller range (e.g., +/- 30 units) to keep the area in view
+    // AREA_W is 200, so 30 is about 15% shift
+    const rangeX = 30
+    const rangeY = 20
+    mouseOffset.x = (mousePos.x / windowHalfX) * rangeX
+    mouseOffset.y = -(mousePos.y / windowHalfY) * rangeY
+    mouseOffset.z = 0
 }
 
 const init = () => {
@@ -49,9 +53,14 @@ const init = () => {
     renderer.setSize(canvasContainer.value!.offsetWidth, canvasContainer.value!.offsetHeight)
     canvasContainer.value?.appendChild(renderer.domElement)
     
-    // Initial camera position matches target
-    camera.position.copy(targetCameraPos)
-    camera.lookAt(targetCameraPos.x, targetCameraPos.y, 0)
+    // Initial camera position based on the first area
+    viewCenter.copy(boxAreas[0].cameraPos)
+    camera.position.copy(viewCenter)
+    // Calculate initial target with mouse offset (which starts at 0,0,0)
+    const targetPos = viewCenter.clone().add(mouseOffset)
+    camera.position.copy(targetPos)
+    
+    camera.lookAt(camera.position.x, camera.position.y, 0)
     
     document.addEventListener('mousemove', onDocumentMouseMove)
 }
@@ -61,15 +70,11 @@ const animate = () => {
     
     const dampingFactor = 0.05
     
-    // Override Z to be the viewing distance
-    targetCameraPos.z = CAM_Z_OFFSET 
+    // Calculate final target: View Center (animated by buttons) + Mouse Offset (interactive)
+    const targetPos = viewCenter.clone().add(mouseOffset)
 
-    // Use Vector3.lerp for cleaner damping
-    camera.position.lerp(targetCameraPos, dampingFactor)
-    
-    // Always look at the point directly in front of the camera on the Z=0 plane
-    // This ensures "looking in normal direction" (towards -Z)
-    camera.lookAt(camera.position.x, camera.position.y, 0)
+    // Smoothly interpolate camera to target
+    camera.position.lerp(targetPos, dampingFactor)
     
     renderer.render(scene, camera)
 }
@@ -239,36 +244,17 @@ const initSceneObj = () => {
 }
 
 const changeCameraArea = (area: BoxArea) => {
-    // Current camera state
-    const startPos = camera.position.clone()
-    const startLookAt = new THREE.Vector3()
-    camera.getWorldDirection(startLookAt)
-    startLookAt.add(startPos) // Get current lookAt target
-
-    // Target camera state
-    const endPos = area.cameraPos.clone()
-    const endLookAt = area.cameraLookAt.clone()
-
-    // Tween animation
-    const duration = 2000 // ms
-    const t = { t: 0 }
+    // Tween viewCenter to the new area's position
+    const start = viewCenter.clone()
+    const end = area.cameraPos.clone()
     
     tweenGroup.removeAll()
 
-    const tween = new Tween(t)
-        .to({ t: 1 }, duration)
+    const tween = new Tween(viewCenter) // Tween the viewCenter object directly
+        .to({ x: end.x, y: end.y, z: end.z }, 2000)
         .easing(Easing.Quadratic.InOut)
-        .onUpdate(() => {
-            // Linear interpolation for Position
-            const pos = new THREE.Vector3().lerpVectors(startPos, endPos, t.t)
-
-            camera.position.copy(pos)
-
-            // Linear interpolation for LookAt
-            const currentLookAt = new THREE.Vector3().lerpVectors(startLookAt, endLookAt, t.t)
-            camera.lookAt(currentLookAt)
-        })
         .start()
+        
     tweenGroup.add(tween)
 }
 
