@@ -41,10 +41,22 @@ const onDocumentMouseMove = (event: MouseEvent) => {
     // Grid total width = 2 * AREA_W = 400
     // Grid total height = 2 * AREA_H = 225
     // Range should be roughly half of that to reach edges from center
-    const rangeX = 220 
-    const rangeY = 130
-    mouseOffset.x = (mousePos.x / windowHalfX) * rangeX
-    mouseOffset.y = -(mousePos.y / windowHalfY) * rangeY
+    const rangeX = 60 
+    const rangeY = 35
+    
+    // Calculate the potential full offset based on mouse position
+    const fullOffsetX = (mousePos.x / windowHalfX) * rangeX
+    const fullOffsetY = -(mousePos.y / windowHalfY) * rangeY
+
+    // Apply the offset RELATIVE to the current viewCenter
+    // If viewCenter is at Top-Left (-OFFSET_X, OFFSET_Y), and mouse is at Top-Left (-windowHalfX, -windowHalfY)
+    // We want the camera to look MORE to the Top-Left, but not double count the position.
+    // Actually, the user wants "Joystick" behavior around the CURRENT center.
+    // So mouse at center screen = 0 offset. Mouse at edge = max offset.
+    // This offset should be added to the CURRENT viewCenter.
+    
+    mouseOffset.x = fullOffsetX
+    mouseOffset.y = fullOffsetY
     mouseOffset.z = 0
 }
 
@@ -266,60 +278,69 @@ const AREA_D = 100
 
 // 2x2 Grid Layout
 // Center offsets
+// The camera position should be at the CENTER of each quadrant
+// Top-Left center: (-AREA_W/2, AREA_H/2)
+// Top-Right center: (AREA_W/2, AREA_H/2)
+// Bottom-Left center: (-AREA_W/2, -AREA_H/2)
+// Bottom-Right center: (AREA_W/2, -AREA_H/2)
 const OFFSET_X = AREA_W / 2
 const OFFSET_Y = AREA_H / 2
 
 const boxAreas: BoxArea[] = [
     {
-        // Top-Left
+        // Top-Left (Quadrant 2)
         name: themeList[0].name,
         description: themeList[0].description,
         cameraPos: new THREE.Vector3(-OFFSET_X, OFFSET_Y, CAM_Z_OFFSET),
         cameraLookAt: new THREE.Vector3(-OFFSET_X, OFFSET_Y, 0),
         areaPos: [
-            new THREE.Vector3(-AREA_W, AREA_H, AREA_D / 2),
-            new THREE.Vector3(-AREA_W, 0, AREA_D / 2),
-            new THREE.Vector3(0, 0, AREA_D / 2),
-            new THREE.Vector3(0, AREA_H, -AREA_D / 2),
+            // Front face corners
+            new THREE.Vector3(-AREA_W, AREA_H, AREA_D / 2),   // Top Left
+            new THREE.Vector3(-AREA_W, 0, AREA_D / 2),        // Bottom Left
+            new THREE.Vector3(0, 0, AREA_D / 2),              // Bottom Right
+            new THREE.Vector3(0, AREA_H, AREA_D / 2),         // Top Right
         ]
     },
     {
-        // Top-Right
+        // Top-Right (Quadrant 1)
         name: themeList[1].name,
         description: themeList[1].description,
         cameraPos: new THREE.Vector3(OFFSET_X, OFFSET_Y, CAM_Z_OFFSET),
         cameraLookAt: new THREE.Vector3(OFFSET_X, OFFSET_Y, 0),
         areaPos: [
-            new THREE.Vector3(0, AREA_H, AREA_D / 2),
-            new THREE.Vector3(0, 0, AREA_D / 2),
-            new THREE.Vector3(AREA_W, 0, AREA_D / 2),
-            new THREE.Vector3(AREA_W, AREA_H, -AREA_D / 2),
+             // Front face corners
+            new THREE.Vector3(0, AREA_H, AREA_D / 2),         // Top Left
+            new THREE.Vector3(0, 0, AREA_D / 2),              // Bottom Left
+            new THREE.Vector3(AREA_W, 0, AREA_D / 2),         // Bottom Right
+            new THREE.Vector3(AREA_W, AREA_H, AREA_D / 2),    // Top Right
         ]
     },
     {
-        // Bottom-Left
+        // Bottom-Left (Quadrant 3)
         name: themeList[2].name,
         description: themeList[2].description,
         cameraPos: new THREE.Vector3(-OFFSET_X, -OFFSET_Y, CAM_Z_OFFSET),
         cameraLookAt: new THREE.Vector3(-OFFSET_X, -OFFSET_Y, 0),
         areaPos: [
-            new THREE.Vector3(-AREA_W, 0, AREA_D / 2),
-            new THREE.Vector3(-AREA_W, -AREA_H, AREA_D / 2),
-            new THREE.Vector3(0, -AREA_H, AREA_D / 2),
-            new THREE.Vector3(0, 0, -AREA_D / 2),
+             // Front face corners
+            new THREE.Vector3(-AREA_W, 0, AREA_D / 2),        // Top Left
+            new THREE.Vector3(-AREA_W, -AREA_H, AREA_D / 2),  // Bottom Left
+            new THREE.Vector3(0, -AREA_H, AREA_D / 2),        // Bottom Right
+            new THREE.Vector3(0, 0, AREA_D / 2),              // Top Right
         ]
     },
     {
-        // Bottom-Right
+        // Bottom-Right (Quadrant 4)
         name: themeList[3].name,
         description: themeList[3].description,
         cameraPos: new THREE.Vector3(OFFSET_X, -OFFSET_Y, CAM_Z_OFFSET),
         cameraLookAt: new THREE.Vector3(OFFSET_X, -OFFSET_Y, 0),
         areaPos: [
-            new THREE.Vector3(0, 0, AREA_D / 2),
-            new THREE.Vector3(0, -AREA_H, AREA_D / 2),
-            new THREE.Vector3(AREA_W, -AREA_H, AREA_D / 2),
-            new THREE.Vector3(AREA_W, 0, -AREA_D / 2),
+             // Front face corners
+            new THREE.Vector3(0, 0, AREA_D / 2),              // Top Left
+            new THREE.Vector3(0, -AREA_H, AREA_D / 2),        // Bottom Left
+            new THREE.Vector3(AREA_W, -AREA_H, AREA_D / 2),   // Bottom Right
+            new THREE.Vector3(AREA_W, 0, AREA_D / 2),         // Top Right
         ]
     },
 ]
@@ -378,7 +399,29 @@ const initSceneObj = () => {
 
             if (geometry && material) {
                 const mesh = new THREE.Mesh(geometry, material)
-                mesh.position.copy(getRandomPosInArea(area.areaPos))
+                // Use a dedicated helper that respects the new quadrant-based bounds
+                // The original getRandomPosInArea was using the bounding box of the points, 
+                // which is correct if the points define the box volume.
+                // Our points define the Front Face. We need to extend this to volume.
+                // Z range is [AREA_D/2, -AREA_D/2] (Front to Back)
+                
+                // Get bounds from the areaPos (Front Face)
+                const minX = Math.min(...area.areaPos.map(v => v.x))
+                const maxX = Math.max(...area.areaPos.map(v => v.x))
+                const minY = Math.min(...area.areaPos.map(v => v.y))
+                const maxY = Math.max(...area.areaPos.map(v => v.y))
+                
+                // Z depth is fixed for all boxes centered at 0
+                // Front is at AREA_D/2, Back is at -AREA_D/2
+                const minZ = -AREA_D / 2
+                const maxZ = AREA_D / 2
+
+                mesh.position.set(
+                    THREE.MathUtils.randFloat(minX, maxX),
+                    THREE.MathUtils.randFloat(minY, maxY),
+                    THREE.MathUtils.randFloat(minZ, maxZ)
+                )
+                
                 mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0)
                 group.add(mesh)
             }
