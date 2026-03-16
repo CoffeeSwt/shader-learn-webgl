@@ -37,10 +37,12 @@ const onDocumentMouseMove = (event: MouseEvent) => {
     mousePos.y = (event.clientY - windowHalfY)
     
     // Map mouse position to world offset
-    // Limit movement to a smaller range (e.g., +/- 30 units) to keep the area in view
-    // AREA_W is 200, so 30 is about 15% shift
-    const rangeX = 30
-    const rangeY = 20
+    // Allow moving across the entire 2x2 grid area
+    // Grid total width = 2 * AREA_W = 400
+    // Grid total height = 2 * AREA_H = 225
+    // Range should be roughly half of that to reach edges from center
+    const rangeX = 220 
+    const rangeY = 130
     mouseOffset.x = (mousePos.x / windowHalfX) * rangeX
     mouseOffset.y = -(mousePos.y / windowHalfY) * rangeY
     mouseOffset.z = 0
@@ -48,7 +50,10 @@ const onDocumentMouseMove = (event: MouseEvent) => {
 
 const init = () => {
     scene = new THREE.Scene()
-    camera = new THREE.PerspectiveCamera(75, canvasContainer.value!.offsetWidth / canvasContainer.value!.offsetHeight, 0.1, 1000)
+    scene.background = new THREE.Color(0x050510)
+    scene.fog = new THREE.FogExp2(0x050510, 0.001)
+
+    camera = new THREE.PerspectiveCamera(75, canvasContainer.value!.offsetWidth / canvasContainer.value!.offsetHeight, 0.1, 2000)
     renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(canvasContainer.value!.offsetWidth, canvasContainer.value!.offsetHeight)
     canvasContainer.value?.appendChild(renderer.domElement)
@@ -64,6 +69,88 @@ const init = () => {
     
     document.addEventListener('mousemove', onDocumentMouseMove)
 }
+
+const initSciFiBackground = () => {
+    // 1. Particle System with Connections (Data Flow)
+    const particleCount = 2000 // Increased count
+    const connectionDistance = 150 // Distance to connect
+    const particleGeometry = new THREE.BufferGeometry()
+    const particlePositions = new Float32Array(particleCount * 3)
+    const particleVelocities = []
+
+    for (let i = 0; i < particleCount; i++) {
+        // Spread particles in a wider volume
+        const x = (Math.random() - 0.5) * 2500
+        const y = (Math.random() - 0.5) * 2500
+        const z = (Math.random() - 0.5) * 1000 - 500 // Push back a bit
+        particlePositions[i * 3] = x
+        particlePositions[i * 3 + 1] = y
+        particlePositions[i * 3 + 2] = z
+        
+        particleVelocities.push({
+            x: (Math.random() - 0.5) * 0.8,
+            y: (Math.random() - 0.5) * 0.8,
+            z: (Math.random() - 0.5) * 0.2
+        })
+    }
+    
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
+    const particleMaterial = new THREE.PointsMaterial({
+        color: 0x00aaff,
+        size: 2.5,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending
+    })
+    const particleSystem = new THREE.Points(particleGeometry, particleMaterial)
+    scene.add(particleSystem)
+
+    // Lines geometry for connections
+    const linesGeometry = new THREE.BufferGeometry()
+    const linesMaterial = new THREE.LineBasicMaterial({
+        color: 0x0088ff,
+        transparent: true,
+        opacity: 0.15,
+        blending: THREE.AdditiveBlending
+    })
+    const linesMesh = new THREE.LineSegments(linesGeometry, linesMaterial)
+    scene.add(linesMesh)
+
+    // Store data for animation
+    particleSystem.userData = { 
+        velocities: particleVelocities,
+        linesMesh: linesMesh,
+        connectionDistance: connectionDistance
+    }
+    
+    // 2. Grid Background (Subtler)
+    const gridHelper = new THREE.GridHelper(3000, 60, 0x0a1a2a, 0x050a15)
+    gridHelper.position.y = -600
+    scene.add(gridHelper)
+    const gridHelperTop = new THREE.GridHelper(3000, 60, 0x0a1a2a, 0x050a15)
+    gridHelperTop.position.y = 600
+    scene.add(gridHelperTop)
+
+    // 3. Rotating Rings (Data Circles) - Removed the "X" (Torus with different rotations)
+    // Kept simple concentric data rings
+    const ringGeometry = new THREE.TorusGeometry(700, 1, 16, 100)
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x004488, wireframe: true, transparent: true, opacity: 0.2 })
+    const ring1 = new THREE.Mesh(ringGeometry, ringMaterial)
+    const ring2 = new THREE.Mesh(ringGeometry, ringMaterial)
+    
+    // Flat rings on Z plane behind content
+    ring1.position.z = -200
+    ring2.position.z = -200
+    ring2.scale.set(1.2, 1.2, 1) // Outer ring
+
+    scene.add(ring1)
+    scene.add(ring2)
+    
+    return { particleSystem, rings: [ring1, ring2] }
+}
+
+let bgObjects: any = null
+
 const animate = () => {
     requestAnimationFrame(animate)
     tweenGroup.update()
@@ -75,6 +162,63 @@ const animate = () => {
 
     // Smoothly interpolate camera to target
     camera.position.lerp(targetPos, dampingFactor)
+    
+    // Animate Background
+    if (bgObjects) {
+        // Rotate rings
+        bgObjects.rings.forEach((ring: THREE.Mesh, i: number) => {
+            ring.rotation.z += 0.0005 * (i % 2 === 0 ? 1 : -1)
+        })
+        
+        // Move particles and update lines
+        const pSystem = bgObjects.particleSystem
+        const positions = pSystem.geometry.attributes.position.array
+        const velocities = pSystem.userData.velocities
+        const count = positions.length / 3
+        
+        // Update positions
+        for(let i = 0; i < count; i++) {
+            positions[i*3] += velocities[i].x
+            positions[i*3+1] += velocities[i].y
+            positions[i*3+2] += velocities[i].z
+            
+            // Wrap around
+            if(Math.abs(positions[i*3]) > 1250) positions[i*3] = -positions[i*3]
+            if(Math.abs(positions[i*3+1]) > 1250) positions[i*3+1] = -positions[i*3+1]
+            if(Math.abs(positions[i*3+2]) > 800) positions[i*3+2] = -positions[i*3+2]
+        }
+        pSystem.geometry.attributes.position.needsUpdate = true
+
+        // Update Connections (Dynamic Lines)
+        // Optimization: Only check a subset or use spatial partitioning for better perf in production
+        // For 2000 particles, O(N^2) is heavy. Let's limit line checks to closest neighbors roughly or just random subset
+        // Simple approach: only connect first 200 particles to others to save frames
+        
+        const linePositions = []
+        const connectLimit = 300 // Only check connections for this many particles to maintain 60fps
+        const distSq = pSystem.userData.connectionDistance * pSystem.userData.connectionDistance
+        
+        for (let i = 0; i < connectLimit; i++) {
+            for (let j = i + 1; j < count; j++) {
+                const dx = positions[i*3] - positions[j*3]
+                const dy = positions[i*3+1] - positions[j*3+1]
+                const dz = positions[i*3+2] - positions[j*3+2]
+                
+                const dist = dx*dx + dy*dy + dz*dz
+                
+                if (dist < distSq) {
+                    // Add line
+                    linePositions.push(
+                        positions[i*3], positions[i*3+1], positions[i*3+2],
+                        positions[j*3], positions[j*3+1], positions[j*3+2]
+                    )
+                }
+            }
+        }
+        
+        const linesMesh = pSystem.userData.linesMesh
+        linesMesh.geometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3))
+    }
     
     renderer.render(scene, camera)
 }
@@ -261,6 +405,7 @@ const changeCameraArea = (area: BoxArea) => {
 
 onMounted(() => {
     init()
+    bgObjects = initSciFiBackground()
     animate()
     initSceneObj()
 })
