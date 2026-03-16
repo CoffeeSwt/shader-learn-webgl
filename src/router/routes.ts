@@ -80,5 +80,10 @@ export const routes: Array<RouteRecordRaw> = [
     path: "/anbao/venue/:id",
     name: "AnbaoVenue",
     component: () => import("@/views/Anbao/index.vue")
+  },
+  {
+    path: "/baidu",
+    name: "BaiduQF",
+    component: () => import("@/views/BaiduQF/BaiduQF.vue")
   }
 ];
