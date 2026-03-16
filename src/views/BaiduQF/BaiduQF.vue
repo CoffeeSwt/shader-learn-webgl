@@ -23,18 +23,54 @@ let camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 1000)
 let renderer = new THREE.WebGLRenderer({ antialias: true })
 const tweenGroup = new Group()
 
+// Mouse interaction state
+const mousePos = new THREE.Vector2()
+const targetCameraPos = new THREE.Vector3(0, 0, 1000) // Start at initial Z
+const windowHalfX = window.innerWidth / 2
+const windowHalfY = window.innerHeight / 2
+
+const onDocumentMouseMove = (event: MouseEvent) => {
+    mousePos.x = (event.clientX - windowHalfX)
+    mousePos.y = (event.clientY - windowHalfY)
+    
+    // Map mouse position to world coordinates
+    // Mouse X range: [-windowHalfX, windowHalfX] -> World X range: [-200, 200] (approx total width 400)
+    // Mouse Y range: [-windowHalfY, windowHalfY] -> World Y range: [-112.5, 112.5] (approx total height 225)
+    // We add some multiplier to allow reaching edges comfortably or overshooting slightly
+    const sensitivity = 1.2
+    targetCameraPos.x = (mousePos.x / windowHalfX) * 200 * sensitivity
+    targetCameraPos.y = -(mousePos.y / windowHalfY) * 112.5 * sensitivity
+}
+
 const init = () => {
     scene = new THREE.Scene()
     camera = new THREE.PerspectiveCamera(75, canvasContainer.value!.offsetWidth / canvasContainer.value!.offsetHeight, 0.1, 1000)
     renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(canvasContainer.value!.offsetWidth, canvasContainer.value!.offsetHeight)
     canvasContainer.value?.appendChild(renderer.domElement)
-    camera.position.z = 1000
-    camera.lookAt(0, 0, 0)
+    
+    // Initial camera position matches target
+    camera.position.copy(targetCameraPos)
+    camera.lookAt(targetCameraPos.x, targetCameraPos.y, 0)
+    
+    document.addEventListener('mousemove', onDocumentMouseMove)
 }
 const animate = () => {
     requestAnimationFrame(animate)
     tweenGroup.update()
+    
+    const dampingFactor = 0.05
+    
+    // Override Z to be the viewing distance
+    targetCameraPos.z = CAM_Z_OFFSET 
+
+    // Use Vector3.lerp for cleaner damping
+    camera.position.lerp(targetCameraPos, dampingFactor)
+    
+    // Always look at the point directly in front of the camera on the Z=0 plane
+    // This ensures "looking in normal direction" (towards -Z)
+    camera.lookAt(camera.position.x, camera.position.y, 0)
+    
     renderer.render(scene, camera)
 }
 
