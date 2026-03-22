@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from "vue-router";
 
 export const routes: Array<RouteRecordRaw> = [
-  { path: "/", redirect: "/anbao" },
+  { path: "/", redirect: "/home" },
 
   { path: "/home", name: "Home", component: () => import("@/views/Home.vue") },
   // { path: "/demo", name: "Demo", component: () => import("@/views/Demo.vue") },
@@ -85,5 +85,10 @@ export const routes: Array<RouteRecordRaw> = [
     path: "/baidu",
     name: "BaiduQF",
     component: () => import("@/views/BaiduQF/BaiduQF.vue")
-  }
+  },
+  {
+    path: "/butterfly",
+    name: "Butterfly",
+    component: () => import("@/views/Butterfly/Butterfly.vue")
+  },
 ];

@@ -2,7 +2,6 @@
     <div size-screen>
         <div size-full ref="canvasTarget"></div>
     </div>
-
 </template>
 
 <script lang="ts" setup>
