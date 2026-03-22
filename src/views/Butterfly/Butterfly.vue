@@ -64,18 +64,18 @@ let controls: OrbitControls | null = null;
 let clock: THREE.Clock | null = null;
 let animationId: number | null = null;
 
-// Store all generated butterflies
+// 存储所有生成的蝴蝶数据
 interface ButterflyData {
-    mesh: THREE.Group;
-    leftWing: THREE.Mesh;
-    rightWing: THREE.Mesh;
-    speed: number;
-    flapSpeed: number;
-    offset: number;
-    radius: number;
-    yOffset: number;
-    wanderX: number;
-    wanderZ: number;
+    mesh: THREE.Group;       // 蝴蝶的3D组（包含左右翅膀和身体）
+    leftWing: THREE.Mesh;    // 左翅膀网格
+    rightWing: THREE.Mesh;   // 右翅膀网格
+    speed: number;           // 整体飞行速度倍率
+    flapSpeed: number;       // 翅膀扇动频率
+    offset: number;          // 动画时间偏移量（确保每只蝴蝶动作不同步）
+    radius: number;          // 飞行轨迹的半径大小
+    yOffset: number;         // 基础飞行高度
+    wanderX: number;         // X轴的随机游荡偏移
+    wanderZ: number;         // Z轴的随机游荡偏移
 }
 let butterflies: ButterflyData[] = [];
 
@@ -87,7 +87,7 @@ const onFileChange = (e: Event) => {
     }
 };
 
-// --- Image Processing: Extract Butterfly from Background ---
+// --- 图像处理：从白色/黑色背景中提取蝴蝶涂鸦 ---
 const extractButterflyTexture = async (url: string): Promise<THREE.Texture> => {
     return new Promise((resolve) => {
         const img = new Image();
@@ -97,48 +97,47 @@ const extractButterflyTexture = async (url: string): Promise<THREE.Texture> => {
             canvas.height = img.height;
             const ctx = canvas.getContext('2d')!;
             ctx.drawImage(img, 0, 0);
-
+            
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
 
-            // Sample corners to determine background color
+            // 采样四个角的颜色，计算出背景的平均色值（假设四个角都是背景色）
             const corners = [
-                0, // Top-Left
-                (canvas.width - 1) * 4, // Top-Right
-                (canvas.height - 1) * canvas.width * 4, // Bottom-Left
-                ((canvas.height - 1) * canvas.width + canvas.width - 1) * 4 // Bottom-Right
+                0, // 左上角
+                (canvas.width - 1) * 4, // 右上角
+                (canvas.height - 1) * canvas.width * 4, // 左下角
+                ((canvas.height - 1) * canvas.width + canvas.width - 1) * 4 // 右下角
             ];
-
+            
             let r = 0, g = 0, b = 0;
             corners.forEach(idx => {
                 r += data[idx];
-                g += data[idx + 1];
-                b += data[idx + 2];
+                g += data[idx+1];
+                b += data[idx+2];
             });
             r /= 4; g /= 4; b /= 4;
 
-            // Tolerance for background removal
-            const threshold = 40;
+            // 背景容差值，用于判断像素是否接近背景色
+            const threshold = 40; 
 
             for (let i = 0; i < data.length; i += 4) {
-                const pr = data[i], pg = data[i + 1], pb = data[i + 2];
+                const pr = data[i], pg = data[i+1], pb = data[i+2];
+                // 计算当前像素与背景色的色差距离
                 const dist = Math.abs(pr - r) + Math.abs(pg - g) + Math.abs(pb - b);
-
-                // If pixel is close to background color, make it transparent
+                
+                // 如果色差小于阈值，认为是背景，将透明度(Alpha)设为0
                 if (dist < threshold * 3) {
-                    data[i + 3] = 0;
-                } else {
-                    // Slight edge smoothing for semi-transparent pixels could be added here
+                    data[i+3] = 0; 
                 }
             }
 
             ctx.putImageData(imageData, 0, 0);
             const texture = new THREE.CanvasTexture(canvas);
             texture.colorSpace = THREE.SRGBColorSpace;
-            // Improve texture filtering for models
+            // 优化纹理过滤，防止3D模型上的图片出现锯齿
             texture.minFilter = THREE.LinearMipmapLinearFilter;
             texture.magFilter = THREE.LinearFilter;
-
+            
             resolve(texture);
         };
         img.src = url;
@@ -336,96 +335,100 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
 
     const group = new THREE.Group();
 
-    // Create materials with slight hue variation for "various butterflies"
-    const mat = new THREE.MeshStandardMaterial({
-        map: texture,
+    // 提取纹理，去背景处理
+    const mat = new THREE.MeshStandardMaterial({ 
+        map: texture, 
         side: THREE.DoubleSide,
         transparent: true,
-        alphaTest: 0.1, // Key for cutout
+        alphaTest: 0.1, // 透明度测试，剔除透明度小于0.1的像素，实现抠图效果
         roughness: 0.4,
         metalness: 0.1
     });
 
-    // Optionally tint the material slightly for variety
+    // 随机色相偏移，让同一个图片生成色彩斑斓的各种蝴蝶
     if (index > 0) {
         const hsl = { h: 0, s: 0, l: 0 };
         mat.color.getHSL(hsl);
-        // Slight random hue shift
+        // 色相偏移 + 亮度轻微波动
         mat.color.setHSL((hsl.h + Math.random() * 0.2) % 1.0, hsl.s, hsl.l + (Math.random() * 0.2 - 0.1));
     }
 
-    // High Precision Model: Bending the wings for realism
+    // 高精度蝴蝶模型：通过曲面弯曲让翅膀更真实
     const wingWidth = 2;
     const wingHeight = 3;
-    const segments = 16; // Higher segments for smooth bending
+    const segments = 16; // 细分数越高，翅膀弯曲越平滑
 
-    // --- Left Wing ---
+    // --- 左翅膀 ---
     const leftWingGeo = new THREE.PlaneGeometry(wingWidth, wingHeight, segments, segments);
     const lUvs = leftWingGeo.attributes.uv;
     const lPos = leftWingGeo.attributes.position;
     for (let i = 0; i < lUvs.count; i++) {
         const u = lUvs.getX(i);
-        lUvs.setX(i, u * 0.5); // Map to left half of image
-
-        // Bend the wing: create a natural camber
+        lUvs.setX(i, u * 0.5); // UV映射到图片的左半部分
+        
+        // 模拟自然翅膀的弧度（Camber）
         const x = lPos.getX(i);
-        // x goes from -wingWidth/2 to wingWidth/2. Center of butterfly is right edge (+wingWidth/2)
+        // x 的范围是 [-wingWidth/2, wingWidth/2]。蝴蝶中心轴在右边缘 (+wingWidth/2)
         const distFromCenter = Math.abs(x - (wingWidth / 2));
-        const z = Math.pow(distFromCenter * 0.5, 2) * -0.3; // Curve upwards
+        // 使用二次函数实现向下弯曲的弧度
+        const z = Math.pow(distFromCenter * 0.5, 2) * 0.3; 
         lPos.setZ(i, z);
     }
     leftWingGeo.computeVertexNormals();
-    leftWingGeo.translate(-wingWidth / 2, 0, 0); // Pivot at center
+    leftWingGeo.translate(-wingWidth / 2, 0, 0); // 将旋转轴心移动到翅膀根部（中心）
     
-    // Rotate wing so top of image (head) points towards -Z (forward in Three.js)
-    leftWingGeo.rotateX(-Math.PI / 2);
+    // 旋转翅膀：将平面的正上方（图片头部）指向 Three.js 中的正前方（Z轴负方向）
+    // 旋转后，蝴蝶平躺在地面，头部朝前，彩色背部朝上
+    leftWingGeo.rotateX(Math.PI / 2);
 
     const leftWing = new THREE.Mesh(leftWingGeo, mat);
     leftWing.castShadow = true;
     leftWing.receiveShadow = true;
 
-    // --- Right Wing ---
+    // --- 右翅膀 ---
     const rightWingGeo = new THREE.PlaneGeometry(wingWidth, wingHeight, segments, segments);
     const rUvs = rightWingGeo.attributes.uv;
     const rPos = rightWingGeo.attributes.position;
     for (let i = 0; i < rUvs.count; i++) {
         const u = rUvs.getX(i);
-        rUvs.setX(i, u * 0.5 + 0.5); // Map to right half of image
+        rUvs.setX(i, u * 0.5 + 0.5); // UV映射到图片的右半部分
 
-        // Bend the wing
+        // 模拟自然翅膀的弧度
         const x = rPos.getX(i);
-        // Center of butterfly is left edge (-wingWidth/2)
+        // 右翅膀的中心轴在左边缘 (-wingWidth/2)
         const distFromCenter = Math.abs(x - (-wingWidth / 2));
-        const z = Math.pow(distFromCenter * 0.5, 2) * -0.3; 
+        const z = Math.pow(distFromCenter * 0.5, 2) * 0.3; 
         rPos.setZ(i, z);
     }
     rightWingGeo.computeVertexNormals();
-    rightWingGeo.translate(wingWidth / 2, 0, 0); // Pivot at center
+    rightWingGeo.translate(wingWidth / 2, 0, 0); // 将旋转轴心移动到翅膀根部（中心）
     
-    // Rotate wing so top of image (head) points towards -Z
-    rightWingGeo.rotateX(-Math.PI / 2);
+    // 与左翅膀相同的旋转校正
+    rightWingGeo.rotateX(Math.PI / 2);
 
     const rightWing = new THREE.Mesh(rightWingGeo, mat);
     rightWing.castShadow = true;
     rightWing.receiveShadow = true;
 
-    // --- Body ---
+    // --- 身体 ---
     const bodyGeo = new THREE.CapsuleGeometry(0.15, 0.15, 2, 4, 8);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
-    // Rotate body to align with wings (pointing forward along -Z)
+    
+    // 胶囊体默认是沿着Y轴站立的。我们旋转+90度，让其沿着Z轴趴下，与翅膀方向一致
     bodyGeo.rotateX(Math.PI / 2);
     
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.1; // slightly above wings (y is now up)
+    // 将身体稍微往下移一点，使其悬挂在翅膀中间，而不是凸出在背上
+    body.position.y = -0.1; 
     body.castShadow = true;
 
     group.add(leftWing, rightWing, body);
-
-    // Random Scale
+    
+    // 随机缩放蝴蝶大小
     const scale = Math.random() * 0.4 + 0.3;
     group.scale.set(scale, scale, scale);
 
-    // Initial position
+    // 随机初始位置
     const startX = (Math.random() - 0.5) * 60;
     const startZ = (Math.random() - 0.5) * 60;
     const startY = 3 + Math.random() * 10;
@@ -433,59 +436,65 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
 
     scene.add(group);
 
-    // Store data for animation
+    // 保存动画需要的数据
     butterflies.push({
         mesh: group,
         leftWing,
         rightWing,
-        speed: Math.random() * 0.8 + 0.5,
-        flapSpeed: Math.random() * 5 + 15,
-        offset: Math.random() * 1000,
-        radius: Math.random() * 15 + 5,
-        yOffset: startY,
-        wanderX: (Math.random() - 0.5) * 2,
+        speed: Math.random() * 0.8 + 0.5, // 飞行速度差异
+        flapSpeed: Math.random() * 5 + 15, // 拍翅频率差异
+        offset: Math.random() * 1000,      // 动作时间偏移，防止齐刷刷拍翅膀
+        radius: Math.random() * 15 + 5,    // 环绕飞行的圈圈半径
+        yOffset: startY,                   // 基础飞行高度
+        wanderX: (Math.random() - 0.5) * 2, // 随机游荡偏移量
         wanderZ: (Math.random() - 0.5) * 2
     });
 };
 
 const animate = () => {
-    animationId = requestAnimationFrame(animate);
+  animationId = requestAnimationFrame(animate);
 
-    if (clock && butterflies.length > 0) {
-        const time = clock.getElapsedTime();
-
-        butterflies.forEach(b => {
-            const t = time * b.speed + b.offset;
-
-            // 1. Flap Wings
-          // Use individual offset for flapping to desynchronize them
-          // Since wings are rotated -90 deg on X, flapping happens on Z axis now
+  if (clock && butterflies.length > 0) {
+      const time = clock.getElapsedTime();
+      
+      butterflies.forEach(b => {
+          const t = time * b.speed + b.offset;
+          
+          // 1. 煽动翅膀动画
+          // 引入 b.offset 让每只蝴蝶的拍打动作不同步
+          // 因为之前翅膀绕X轴旋转了90度平躺，所以现在拍打翅膀是绕Z轴旋转
+          // 为了让翅膀在身体上方拍打，我们需要调整旋转的角度方向
+          // 使用正弦波计算角度，但要确保角度使得翅膀向上翻（背部靠近）
+          // 由于左翅膀的轴心在右边缘，绕Z轴正向旋转会往下翻，负向旋转会往上翻
+          // 右翅膀的轴心在左边缘，绕Z轴负向旋转会往下翻，正向旋转会往上翻
           const flapAngle = Math.sin(t * b.flapSpeed + b.offset * 10) * Math.PI / 3;
-          b.leftWing.rotation.z = Math.abs(flapAngle);
-          b.rightWing.rotation.z = -Math.abs(flapAngle);
+          // 取绝对值后，限制在上方拍打
+          // 让翅膀最低点稍微低于水平面（比如 -0.1），最高点高高扬起
+          const upFlap = Math.abs(flapAngle) - 0.2; 
+          b.leftWing.rotation.z = -upFlap; // 负值让左翅膀向上翻
+          b.rightWing.rotation.z = upFlap; // 正值让右翅膀向上翻
 
-            // 2. Flight Path (Complex organic movement)
-          // Base figure-8 pattern, slowed down significantly
-          const pathTime = time * 0.2 * b.speed + b.offset; // Scale time down for path
+          // 2. 飞行轨迹（复杂有机运动算法）
+          // 基础的“8”字形(Lissajous曲线)飞行轨迹，放慢速度使其看起来更优雅
+          const pathTime = time * 0.2 * b.speed + b.offset; 
           
           let px = Math.sin(pathTime) * b.radius + Math.cos(pathTime * 0.7) * b.radius * 0.5;
           let pz = Math.cos(pathTime * 0.8) * b.radius + Math.sin(pathTime * 1.3) * b.radius * 0.5;
           
-          // Add wandering drift (using a very slow sine wave instead of unbounded linear addition)
-          // Unbounded linear addition (time * wanderX) caused the extreme speeds over time!
+          // 添加随机的游荡偏移（使用缓慢的Sin/Cos波形，防止蝴蝶飞出边界）
           b.wanderX = Math.sin(time * 0.1 + b.offset) * 20;
           b.wanderZ = Math.cos(time * 0.15 + b.offset) * 20;
 
           px += b.wanderX;
           pz += b.wanderZ;
 
-          // Gentle bobbing up and down
+          // 飞行时在Y轴上轻微的上下浮动
           const py = b.yOffset + Math.sin(time * 1.5 + b.offset) * 1.5 + Math.cos(time * 0.5 + b.offset) * 1.0;
 
           b.mesh.position.set(px, py, pz);
 
-          // 3. Orientation (Look in direction of travel)
-          // Calculate future position a fraction of a second ahead
+          // 3. 姿态朝向（让蝴蝶头部始终看向飞行的前方）
+          // 计算下一个瞬间(dt)的位置，作为注视(lookAt)的目标点
           const dt = 0.1;
           const nextPathTime = (time + dt) * 0.2 * b.speed + b.offset;
           
@@ -500,17 +509,19 @@ const animate = () => {
           
           let ny = b.yOffset + Math.sin((time + dt) * 1.5 + b.offset) * 1.5 + Math.cos((time + dt) * 0.5 + b.offset) * 1.0;
           
+          // 让蝴蝶看向预测的下一个点
           b.mesh.lookAt(nx, ny, nz);
           
-          // Pitch up slightly when flying upwards
-          // Smooth the pitch to prevent jitter
+          // 4. 飞行俯仰角动态调整
+          // 当蝴蝶向上飞时，头部微微抬起；向下飞时，头部微微按下
+          // 因为之前模型翻转过，所以这里旋转值为正数代表抬头
           const pitchTarget = (ny - py) * 0.8;
-          b.mesh.rotateX(-pitchTarget); 
+          b.mesh.rotateX(pitchTarget); 
       });
-    }
+  }
 
-    if (controls) controls.update();
-    if (renderer && scene && camera) renderer.render(scene, camera);
+  if (controls) controls.update();
+  if (renderer && scene && camera) renderer.render(scene, camera);
 };
 
 const onWindowResize = () => {
