@@ -376,6 +376,9 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
     }
     leftWingGeo.computeVertexNormals();
     leftWingGeo.translate(-wingWidth / 2, 0, 0); // Pivot at center
+    
+    // Rotate wing so top of image (head) points towards -Z (forward in Three.js)
+    leftWingGeo.rotateX(-Math.PI / 2);
 
     const leftWing = new THREE.Mesh(leftWingGeo, mat);
     leftWing.castShadow = true;
@@ -393,11 +396,14 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
         const x = rPos.getX(i);
         // Center of butterfly is left edge (-wingWidth/2)
         const distFromCenter = Math.abs(x - (-wingWidth / 2));
-        const z = Math.pow(distFromCenter * 0.5, 2) * -0.3;
+        const z = Math.pow(distFromCenter * 0.5, 2) * -0.3; 
         rPos.setZ(i, z);
     }
     rightWingGeo.computeVertexNormals();
     rightWingGeo.translate(wingWidth / 2, 0, 0); // Pivot at center
+    
+    // Rotate wing so top of image (head) points towards -Z
+    rightWingGeo.rotateX(-Math.PI / 2);
 
     const rightWing = new THREE.Mesh(rightWingGeo, mat);
     rightWing.castShadow = true;
@@ -406,46 +412,30 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
     // --- Body ---
     const bodyGeo = new THREE.CapsuleGeometry(0.15, 0.15, 2, 4, 8);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+    // Rotate body to align with wings (pointing forward along -Z)
+    bodyGeo.rotateX(Math.PI / 2);
+    
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.rotation.x = Math.PI / 2;
-    body.position.z = 0.1; // slightly above wings
+    body.position.y = 0.1; // slightly above wings (y is now up)
     body.castShadow = true;
 
     group.add(leftWing, rightWing, body);
 
-    // We want the butterfly to face "forward" when it flies.
-    // By default, the image is drawn on the XY plane (facing +Z). 
-    // Top of the image (head) is +Y. Right wing is +X.
-    // In Three.js, "forward" (lookAt) points towards -Z.
-    // We want the butterfly's head (+Y) to point towards -Z, and its back to face up (+Y).
-    // Let's rotate the whole group so the image lies flat on the XZ plane, with the head pointing to -Z.
-    
-    // Rotate -90 degrees on X axis: 
-    // +Y (head) becomes -Z (forward)
-    // +Z (front face) becomes +Y (up)
-    group.rotation.x = -Math.PI / 2;
-
-    // To allow `lookAt` to work correctly (it aligns the local -Z axis with the target),
-    // we need to wrap the rotated butterfly in an outer container group.
-    // The outer group handles position and lookAt, while the inner group holds the fixed orientation.
-    const container = new THREE.Group();
-    container.add(group);
-    
     // Random Scale
     const scale = Math.random() * 0.4 + 0.3;
-    container.scale.set(scale, scale, scale);
+    group.scale.set(scale, scale, scale);
 
     // Initial position
     const startX = (Math.random() - 0.5) * 60;
     const startZ = (Math.random() - 0.5) * 60;
     const startY = 3 + Math.random() * 10;
-    container.position.set(startX, startY, startZ);
+    group.position.set(startX, startY, startZ);
 
-    scene.add(container);
+    scene.add(group);
 
     // Store data for animation
     butterflies.push({
-        mesh: container, // The container is what we move and lookAt
+        mesh: group,
         leftWing,
         rightWing,
         speed: Math.random() * 0.8 + 0.5,
@@ -469,21 +459,10 @@ const animate = () => {
 
             // 1. Flap Wings
           // Use individual offset for flapping to desynchronize them
-          // Sine wave goes from -1 to 1.
-          // When flat on XZ plane, rotation.y controls the flap up and down.
-          // Because of our container rotation, local Y axis of wings is still pointing "forward" relative to the butterfly image, 
-          // wait, the wings are rotated around the Y axis of the inner group.
-          // Since the inner group is rotated -90 on X, the inner Y axis points towards global -Z.
-          // Flapping around Y means the wings swing like doors, which is correct for flapping up/down when lying flat.
-          // We want the flap to go mostly "up" (positive Z in local space, which is positive Y in global space).
-          // We adjust the sine wave to range mostly on one side.
-          
-          const flapRaw = Math.sin(t * b.flapSpeed + b.offset * 10);
-          // Map -1..1 to roughly 0..1 so wings flap upwards from flat, maybe dipping slightly below
-          const flapAngle = (flapRaw * 0.4 + 0.4) * (Math.PI / 2); 
-          
-          b.leftWing.rotation.y = flapAngle;
-          b.rightWing.rotation.y = -flapAngle;
+          // Since wings are rotated -90 deg on X, flapping happens on Z axis now
+          const flapAngle = Math.sin(t * b.flapSpeed + b.offset * 10) * Math.PI / 3;
+          b.leftWing.rotation.z = Math.abs(flapAngle);
+          b.rightWing.rotation.z = -Math.abs(flapAngle);
 
             // 2. Flight Path (Complex organic movement)
           // Base figure-8 pattern, slowed down significantly
