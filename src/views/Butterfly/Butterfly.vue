@@ -413,21 +413,39 @@ const createButterflyInstance = (texture: THREE.Texture, index: number) => {
 
     group.add(leftWing, rightWing, body);
 
+    // We want the butterfly to face "forward" when it flies.
+    // By default, the image is drawn on the XY plane (facing +Z). 
+    // Top of the image (head) is +Y. Right wing is +X.
+    // In Three.js, "forward" (lookAt) points towards -Z.
+    // We want the butterfly's head (+Y) to point towards -Z, and its back to face up (+Y).
+    // Let's rotate the whole group so the image lies flat on the XZ plane, with the head pointing to -Z.
+    
+    // Rotate -90 degrees on X axis: 
+    // +Y (head) becomes -Z (forward)
+    // +Z (front face) becomes +Y (up)
+    group.rotation.x = -Math.PI / 2;
+
+    // To allow `lookAt` to work correctly (it aligns the local -Z axis with the target),
+    // we need to wrap the rotated butterfly in an outer container group.
+    // The outer group handles position and lookAt, while the inner group holds the fixed orientation.
+    const container = new THREE.Group();
+    container.add(group);
+    
     // Random Scale
     const scale = Math.random() * 0.4 + 0.3;
-    group.scale.set(scale, scale, scale);
+    container.scale.set(scale, scale, scale);
 
     // Initial position
     const startX = (Math.random() - 0.5) * 60;
     const startZ = (Math.random() - 0.5) * 60;
     const startY = 3 + Math.random() * 10;
-    group.position.set(startX, startY, startZ);
+    container.position.set(startX, startY, startZ);
 
-    scene.add(group);
+    scene.add(container);
 
     // Store data for animation
     butterflies.push({
-        mesh: group,
+        mesh: container, // The container is what we move and lookAt
         leftWing,
         rightWing,
         speed: Math.random() * 0.8 + 0.5,
@@ -451,9 +469,21 @@ const animate = () => {
 
             // 1. Flap Wings
           // Use individual offset for flapping to desynchronize them
-          const flapAngle = Math.sin(t * b.flapSpeed + b.offset * 10) * Math.PI / 3;
-          b.leftWing.rotation.y = Math.abs(flapAngle);
-          b.rightWing.rotation.y = -Math.abs(flapAngle);
+          // Sine wave goes from -1 to 1.
+          // When flat on XZ plane, rotation.y controls the flap up and down.
+          // Because of our container rotation, local Y axis of wings is still pointing "forward" relative to the butterfly image, 
+          // wait, the wings are rotated around the Y axis of the inner group.
+          // Since the inner group is rotated -90 on X, the inner Y axis points towards global -Z.
+          // Flapping around Y means the wings swing like doors, which is correct for flapping up/down when lying flat.
+          // We want the flap to go mostly "up" (positive Z in local space, which is positive Y in global space).
+          // We adjust the sine wave to range mostly on one side.
+          
+          const flapRaw = Math.sin(t * b.flapSpeed + b.offset * 10);
+          // Map -1..1 to roughly 0..1 so wings flap upwards from flat, maybe dipping slightly below
+          const flapAngle = (flapRaw * 0.4 + 0.4) * (Math.PI / 2); 
+          
+          b.leftWing.rotation.y = flapAngle;
+          b.rightWing.rotation.y = -flapAngle;
 
             // 2. Flight Path (Complex organic movement)
           // Base figure-8 pattern, slowed down significantly
